@@ -1,0 +1,8 @@
+{
+    "data_path": "data/out/",
+    "commuting_matrices": ["AA^T","ABA^T","ABB^TA^T"],
+    "c": 1.0,
+    "Kernel": "linear",
+    "Degree": 3,
+    "outpath": "data/out/model"
+}

@@ -1,0 +1,7 @@
+{
+    "data_path": "data/out/test-apps/",
+    "job_list": ["summary", "comparison"],
+    "report_in_path": "notebooks/eda_checkpoint02.ipynb",
+    "report_out_path": "report/report.html",
+    "out_folder": "data/out/test-apps/analysis"
+}

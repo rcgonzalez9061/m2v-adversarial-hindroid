@@ -1,0 +1,5 @@
+{
+    "data_path": "data/out/test/",
+    "job_list": ["summary", "comparison"],
+    "out_folder": "data/out/test/analysis"
+}

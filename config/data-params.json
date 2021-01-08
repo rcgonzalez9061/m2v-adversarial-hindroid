@@ -1,0 +1,7 @@
+{
+    "project_root": "~/DSC180Malware/DSC180A-Replication/",
+    "source": "/teams/DSC180A_FA20_A00/a04malware/test-apps",
+    "outfolder": "data/out/test-apps",
+    "app_list": "data/test/testapps.csv",
+    "nprocs": 9
+}

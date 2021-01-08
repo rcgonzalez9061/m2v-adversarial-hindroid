@@ -1,0 +1,6 @@
+{
+    "project_root": "~/DSC180Malware/DSC180A-Replication/",
+    "source": "/teams/DSC180A_FA20_A00/a04malware/test-apps",
+    "outfolder": "/datasets/home/home-00/10/410/rcgonzal/DSC180Malware/DSC180A-Replication/data/out/final_train",
+    "app_list": "~/DSC180Malware/DSC180A-Replication/data/out/merged_train.csv"
+}
