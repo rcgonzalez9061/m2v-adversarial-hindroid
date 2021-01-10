@@ -23,3 +23,5 @@ RUN P=/tmp/$(basename $APK_JAR) && \
     chmod +x $P && \
     mv $P /usr/local/bin/apktool.jar
     
+RUN pip install stellargraph
+    

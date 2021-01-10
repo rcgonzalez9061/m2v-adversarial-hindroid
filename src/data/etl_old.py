@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, '../')
-
 import pandas as pd
 import numpy as np
 import os
@@ -210,11 +207,11 @@ def parse_app(app_dir, api_data_path, app_data_path, edges_fh, context):
                      header=False,
                      index=False,
                      mode='a')
-#         block_edges = pd.DataFrame({
-#             'source': [app.ID]*stats.size,
-#             'target': ,
-#             'type': 'contains',
-#         })
+        block_edges = pd.DataFrame({
+            'source': [app.ID]*stats.size,
+            'target': ,
+            'type': 'contains',
+        })
         
     except Exception as e:
         log(f"\r{type(e).__name__} WHILE PARSING {app.ID} at {app.app_dir}", context['outfolder'])
@@ -262,49 +259,177 @@ def log_error(exception, outfolder):
         log.write(format_exc(exception))
 
 
-def save_dict(d, path):
-    '''
-    Save dictionary to JSON.
-    '''
-    with open(path, 'w') as outfile: 
-        json.dump(d, outfile)
+                           
             
-def get_data(data_source=None, outfolder=None, nprocs=2, trained_source=None):
+def get_data(project_root, source, recompute_all=False, app_list=None, outfolder=None, index=None, step=0, nprocs=2):
     '''
     Retrieve data for year/location/group from the internet
     and return data (or write data to file, if `outfolder` is
     not `None`).
     '''
-    # setup
+    if index is not None:
+        with open(index) as index_file:
+            index = json.load(index_file)
+    
     os.makedirs(outfolder, exist_ok=True)
-    app_to_parse_path = os.path.join(outfolder, 'app_list.csv')  # location of any predetermined apps
-    app_data_path = os.path.join(outfolder, 'app_data.csv')  # app data file
-    api_data_path = os.path.join(outfolder, 'api_data.csv')  # api data file
-    edges_path = os.path.join(outfolder, 'edges.csv')  #  edges file path
-    context_path = os.path.join(outfolder, 'context.json')  # context file for saving progress
-    
-    try:  # search for predetermined list of apps
-        apps_df = pd.read_csv(app_to_parse_path)
-    except FileNotFoundError:  # if no such file, create one by looking for apps under data_source directory
-        apps_df = find_apps(data_source)
-        apps_df.to_csv(app_to_parse_path)
-
+    apps_path = os.path.join(outfolder, 'apps.csv')  # app data file
+    app_data_path = os.path.join(outfolder, 'app_data.csv')  # api data file
+    api_data_path = os.path.join(outfolder, 'api_data.csv')  # 
+    edges_path = os.path.join(outfolder, 'edges.csv')
+    progress_path = os.path.join(outfolder, 'progress_log.json')
     
     
-    parsing_context = {
+    if app_list:  # parse a predetermined app list
+        apps_df = pd.read_csv(app_list)
+    else:
+        # parse folders for app directories, save to file
+        apps_df = find_apps(source)
+        apps_df.to_csv(apps_path)
+    
+    context = {
         'app_counter': 0,
         'num_apps': apps_df.shape[0],
         'parsed_apps': set(),
         'outfolder': outfolder,
         'pkgs_parsed': 0
     }
+    
+    if step <= 1:
+        # setup api_data.csv
+        pd.DataFrame(columns=API_DATA_COLUMNS).to_csv(api_data_path, index=False)
         
+        # setup app_data.csv
+        app_data = pd.DataFrame(columns=['app', 'apis', 'app_dir', 
+                                         'num_apis', 'num_unique_apis', 
+                                         'virtual', 'static', 'direct',
+                                         'interface', 'super']).set_index('app')
+        app_data.to_csv(app_data_path)
+
+        print(f"RUNNING ETL\nData will be available at {Path(outfolder)}")
+        print("STEP 1 - PARSING APPS")
+        with open(api_data_path, 'a') as api_data_file, open(app_data_path, 'a') as app_data_file:
+            # concurrent execution of smali parsing
+            print(f"\rParsed {context['app_counter']} of {context['num_apps']} apps...", end='')
+            with concurrent.futures.ThreadPoolExecutor(max_workers=nprocs) as executor:
+                parsing_futures = {executor.submit(
+                    parse_app, app_dir,         
+                    api_data_file,
+                    app_data_file,
+                    context
+                ): app_dir for app_dir in apps_df.app_dir}
+
+
+        # matrix computation setup
+        apps = list(Application.apps)
+        apps.sort()  # sort for consistency
+        num_apps = len(apps)
+        apps_factorized = pd.factorize(apps)
+        apps_index = {key: 'app' + str(index) for index, key in zip(apps_factorized[0], apps_factorized[1])}
+
+        # get/make index
+        if index is not None:
+            api_index = index['api_index']
+            all_apis = api_index
+            index['app_index'] = apps_index
+        else: 
+            all_apis = list(Application.all_apis)
+            all_apis.sort()  # sort for consistency
+            apis_factorized = pd.factorize(all_apis)
+            api_index = {key: 'api' + str(index) for index, key in zip(apis_factorized[0], apis_factorized[1])}
+
+        # write index to file
+        with open(os.path.join(outfolder, 'index.json'), 'w') as outfile: json.dump({
+            "app_index": apps_index,
+            "api_index": api_index
+        }, outfile)
         
+    with open(os.path.join(outfolder, 'index.json'), 'r') as file: 
+        file = json.load(file)
+        apps_index = file['app_index']
+        api_index = file['api_index']
+        num_apps = len(apps_index)
+        num_apis = len(api_index)
+    
+    
+#     if step <= 2:
+#         # compute A matrix
+#         print("\nSTEP 2 - RECORDING APP-API")
+
+#         app_data = pd.read_csv(app_data_path, index_col='app', iterator=True, chunksize=APP_DATA_PARSING_CHUNKSIZE)
+#         apps_processed = 0
+#         for chunk in app_data:
+#             for app, api_list in chunk.apis.str.slice(1,-1).str.split(', ').items():
+#                 print(f"\rApp {apps_processed} of {num_apps} processed...", end="")
+#                 for api in api_list:
+#                     app_idx = apps_index[app]
+#                     app_idx = apps_index[app]
+#                     try:
+#                         api_idx = api_index[api.strip("'")]
+#                         A_mat[app_idx, api_idx] = 1
+#                     except KeyError:
+#                         pass
+#                 apps_processed += 1
+#         print(f"\rApp {apps_processed} of {num_apps} processed...done.", end="")
+
+#         # write A
+#         sparse.save_npz(os.path.join(outfolder, "A_mat.npz"), A_mat.tocsr())
+    
+# #     if index:  # return if simply evaluating
+# #         print("")
+# #         return
+    
+    if step <= 3:
+        # compute B matrix
+        print("\nSTEP 3 - SAVING ")
+        B_mat = sparse.lil_matrix((num_apis, num_apis), dtype=np.int8)
+
+        edge_count = 0
+        for api1, api2 in Application.API_code_block_edges:
+            if edge_count % 1000 == 0:
+                print(f"\rEdge {edge_count} of {len(Application.API_code_block_edges)} processed...", end="")
+            try:
+                api1_idx = api_index[api1]
+                api2_idx = api_index[api2]
+                B_mat[api1_idx, api2_idx] = 1
+                B_mat[api2_idx, api1_idx] = 1
+            except KeyError:
+                pass                          
+
+            edge_count += 1
+        print(f"\rEdge {edge_count} of {len(Application.API_code_block_edges)} processed...done.", end="")
+    
+#     if step <= 4:
+#         # compute P matrix
+#         print("\nSTEP 4 - BUILDING P MATRIX")    
+#         pkg_tracking_folder = 'data/temp/pkgs'
+#         package_tracking_dict = {}
+#         api_data_iter = pd.read_csv(api_data_path, usecols=['package', 'api'], iterator=True, chunksize=APP_DATA_PARSING_CHUNKSIZE)
+#         for chunk in api_data_iter:
+#             for idx, row in chunk.iterrows():
+#                 if row.package not in package_tracking_dict:
+#                     package_tracking_dict[row.package] = set()
+#                 api = api_index[row.api]
+#                 package_tracking_dict[row.package].add(api)
+#         print('Parsed api_data')
+
+#         P_mat = sparse.lil_matrix((num_apis, num_apis), dtype=np.int8)
+
+#         num_packages = len(package_tracking_dict)
+#         print(f"\rPackage {context['pkgs_parsed']} of {num_packages} processed...", end="")
+#         pkg_futures = set()
+#         while package_tracking_dict:
+#             key, api_set = package_tracking_dict.popitem()
+#             with concurrent.futures.ThreadPoolExecutor(max_workers=nprocs) as executor:
+#                 pkg_futures.add(executor.submit(
+#                     insert_P_edges, 
+#                     api_set,         
+#                     P_mat,
+#                     context,
+#                     num_packages
+#                 ))
         
-        
-        
-        
-        
-        
-        
-        
+
+#         sparse.save_npz(os.path.join(outfolder, "P_mat.npz"), P_mat.tocsr())
+#         print('Done.')
+    print('ETL COMPLETED.')
+    
