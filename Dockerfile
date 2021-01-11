@@ -48,14 +48,15 @@ RUN apt install -y ./libnvinfer7_7.1.3-1+cuda11.0_amd64.deb
 RUN apt-get update -y
 
 # Install development and runtime libraries (~4GB)
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends --allow-downgrades \
     cuda-11-0 \
     libcudnn8=8.0.4.30-1+cuda11.0  \
     libcudnn8-dev=8.0.4.30-1+cuda11.0 
 
 
 # Install TensorRT. Requires that libcudnn8 is installed above.
-RUN apt-get install -y --no-install-recommends libnvinfer7=7.1.3-1+cuda11.0 \
+RUN apt-get install -y --no-install-recommends --allow-downgrades \
+    libnvinfer7=7.1.3-1+cuda11.0 \
     libnvinfer-dev=7.1.3-1+cuda11.0 \
     libnvinfer-plugin7=7.1.3-1+cuda11.0
 
