@@ -2,14 +2,13 @@ FROM ucsdets/scipy-ml-notebook
 
 USER root
 
-RUN apt-get install -y software-properties-common
 
 # from amfraenkel/android-malware-project
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y default-jre && \
-    apt-get install -y default-jdk
-
+    apt-get install -y default-jdk && \
+    apt-get install -y software-properties-common
 
 ENV APK_SCRIPT https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
 ENV APK_JAR https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.4.1.jar
