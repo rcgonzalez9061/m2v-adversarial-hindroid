@@ -2,7 +2,7 @@ FROM ucsdets/scipy-ml-notebook
 
 USER root
 
-RUN apt-get install software-properties-common
+RUN apt-get install -y software-properties-common
 
 # from amfraenkel/android-malware-project
 RUN apt-get update && \
@@ -31,28 +31,28 @@ RUN P=/tmp/$(basename $APK_JAR) && \
 # Add NVIDIA package repositories
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
 RUN mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600
-RUN apt-key adv --fetch-keys RUN https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
 RUN add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
-RUN apt-get update
+RUN apt-get update -y
 
 RUN wget http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/nvidia-machine-RUN learning-repo-ubuntu1804_1.0.0-1_amd64.deb
 
-RUN apt install ./nvidia-machine-learning-repo-ubuntu1804_1.0.0-1_amd64.deb
-RUN apt-get update
+RUN apt install -y ./nvidia-machine-learning-repo-ubuntu1804_1.0.0-1_amd64.deb
+RUN apt-get update -y
 
 # Install NVIDIA driver
-RUN apt-get install --no-install-recommends nvidia-driver-450
+RUN apt-get install -y --no-install-recommends nvidia-driver-450 
 # Reboot. Check that GPUs are visible using the command: nvidia-smi
 
 RUN wget https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/libnvinfer7_7.1.3-1+cuda11.0_amd64.deb
-RUN apt install ./libnvinfer7_7.1.3-1+cuda11.0_amd64.deb
-RUN apt-get update
+RUN apt install -y ./libnvinfer7_7.1.3-1+cuda11.0_amd64.deb
+RUN apt-get update -y
 
 # Install development and runtime libraries (~4GB)
-RUN apt-get install --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
     cuda-11-0 \
     libcudnn8=8.0.4.30-1+cuda11.0  \
-    libcudnn8-dev=8.0.4.30-1+cuda11.0
+    libcudnn8-dev=8.0.4.30-1+cuda11.0 
 
 
 # Install TensorRT. Requires that libcudnn8 is installed above.
