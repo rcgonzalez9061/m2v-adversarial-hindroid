@@ -2,6 +2,8 @@ FROM ucsdets/scipy-ml-notebook
 
 USER root
 
+RUN apt-get install software-properties-common
+
 # from amfraenkel/android-malware-project
 RUN apt-get update && \
     apt-get upgrade -y && \
