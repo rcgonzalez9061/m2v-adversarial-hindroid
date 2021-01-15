@@ -6,6 +6,7 @@
     },
     "feature_params": {
         "walk_args": {
+            "nprocs": 16,
             "length": 100,
             "n": 1,
             "metapaths": [
