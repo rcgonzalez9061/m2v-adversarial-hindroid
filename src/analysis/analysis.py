@@ -14,7 +14,7 @@ import plotly.graph_objs as go
 import plotly.io as pio
 
 
-def make_groundtruth_figures(data_folder):
+def make_groundtruth_figures(data_folder, update_figs):
     vectors = pd.read_csv(os.path.join(data_folder, 'features.csv'))
     vectors = vectors.set_index('app')
     
@@ -67,26 +67,63 @@ def make_groundtruth_figures(data_folder):
     type_chart['num'] = type_chart.type.map(label_map)
 
     layout = go.Layout(
-        title="3D representation of node embeddings",
+        title="Interactive 3D TNSE representation of node embeddings",
         margin={'l': 0, 'r': 0, 'b': 0, 't': 30},
-        legend=dict(y=0.5, itemsizing='constant')
+        legend=dict(y=0.5, itemsizing='constant'),
+        scene={
+            'xaxis': {
+                'showspikes': False,
+                'showgrid': False, 
+                'zeroline': False, 
+                'visible': False
+            },
+            'yaxis': {
+                'showspikes': False,
+                'showgrid': False, 
+                'zeroline': False, 
+                'visible': False
+            },
+            'zaxis': {
+                'showspikes': False,
+                'showgrid': False, 
+                'zeroline': False, 
+                'visible': False
+            }
+        }
     )
 
     fig = go.Figure(layout=layout)
 
+    # add invisible bounding trace to keep axes' scale constant
+    fig.add_trace(
+        go.Scatter3d(
+            x=[data_3d[0].min(), data_3d[0].max()],
+            y=[data_3d[1].min(), data_3d[1].max()],
+            z=[data_3d[2].min(), data_3d[2].max()],
+            mode='markers',
+            marker={
+                'color':'rgba(0,0,0,0)',
+                'opacity': 0,
+            },
+            showlegend=False
+        )
+    )
+
     for index, row in type_chart.sort_values('num', ascending=False).iterrows():
         if row['malware']:
             symbol = 'circle'
-            name = f"Malware, {row['type']}"
+            group='Malware'
             size = 2
         else:
             symbol = 'x'
-            name = f"Non-malware, {row['type']}"
+            group='Non-Malware'
             size = 1.5
-        
+
+        name = f"{group}, {row['type']}"
+
         if row['type']=='Other malware':
             name=row['type']
-        
+
         df = data_3d[data_3d.type==row['type']]
         rbg = tuple([255*val for val in cm.tab10(row['num'])[:3]])
         color = f"rgb{rbg}"
@@ -105,8 +142,8 @@ def make_groundtruth_figures(data_folder):
                 'size': size,
                 'opacity': 1,
                 'color': color,
-                'symbol': symbol
-            }
+                'symbol': symbol,
+            },
         )
 
         fig.add_trace(trace)
@@ -114,8 +151,11 @@ def make_groundtruth_figures(data_folder):
     # Save the plot.
     pio.write_html(fig, file=os.path.join(data_folder, '3D-plot.html'), auto_open=True)
     
+    if update_figs:
+        pio.write_html(fig, file=os.path.join('docs', '_includes', '3D-plot.html'), auto_open=True)
     
-def generate_analysis(data_path, job_list=[], **kwargs):
+    
+def generate_analysis(data_path, update_figs=False, job_list=[]):
     "Generates plots, aggregates, and statistical analysis on app data located in `data_path`"
 
     #  load data
@@ -125,4 +165,4 @@ def generate_analysis(data_path, job_list=[], **kwargs):
 
     
     if "plots" in job_list:
-        make_groundtruth_figures(data_path)
+        make_groundtruth_figures(data_path, update_figs)
