@@ -8,7 +8,7 @@ permalink: /
 
 ## INTRODUCTION
 
-Over the past decade, malware has established itself as a constant issue for the Android operating system. In 2018, Symantec reported that they blocked more than 10 thousand malware apps per day, while nearly 3 quarters of Android devices remained on older versions of Android. With billions active Android devices, millions are only a swipe away from becoming victims. Naturally, automated machine learning-based detection systems have become commonplace solutions to address this threat. However, it has been shown that many of these models are vulnerable to adversarial attacks, notably those that add redundant code to malware to consfuse detectors. 
+Over the past decade, malware has established itself as a constant issue for the Android operating system. In 2018, Symantec reported that they blocked more than 10 thousand malware apps per day, while nearly 3 quarters of Android devices remained on older versions of Android. With billions active Android devices, millions are only a swipe away from becoming victims. Naturally, automated machine learning-based detection systems have become commonplace solutions to address this threat. However, it has been shown that many of these models are vulnerable to adversarial attacks, notably attacks that add redundant code to malware to consfuse detectors. 
 
 First, we intend to break an existing malware detection system, [Hindroid](https://www.cse.ust.hk/~yqsong/papers/2017-KDD-HINDROID.pdf) using a method similar to that proposed in [Android HIV](https://ieeexplore.ieee.org/document/8782574). Second, we introduce a new model that extends HinDroid that we hope to be more resilient to perturbations in malware code. 
 
@@ -22,7 +22,7 @@ First, we introduce a new model that extends the [Hindroid detection system](htt
 
 ### HIN Construction
 Our heterogeneous information network contains 4 types of nodes which we define: 
-- $Apps$: Android apps determined by name.
+- \(Apps\): Android apps determined by name.
 - $APIs$: APIs determined by their smali representation, i.e. `Lpackage/Class;->method();V`
 - $Packages$: the package an API originates from.
 - $Methods$: Methods (or "functions") that API calls appear in.
