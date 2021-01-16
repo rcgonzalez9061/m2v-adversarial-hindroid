@@ -1,3 +1,9 @@
+---
+layout: notebook
+title: m2vDroid
+permalink: /
+---
+
 # m2vDroid: Perturbation-resilient metapath-based Android Malware Detection
 
 ## INTRODUCTION
