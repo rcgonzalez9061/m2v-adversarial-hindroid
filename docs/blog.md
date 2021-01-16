@@ -1,5 +1,5 @@
 ---
-layout: notebook
+layout: page
 title: m2vDroid
 permalink: /
 ---
