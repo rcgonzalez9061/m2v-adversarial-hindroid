@@ -4,6 +4,8 @@ title: m2vDroid
 permalink: /
 ---
 
+{% include head.html %}
+
 # m2vDroid: Perturbation-resilient metapath-based Android Malware Detection
 
 ## INTRODUCTION
