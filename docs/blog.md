@@ -24,7 +24,7 @@ First, we introduce a new model that extends the [Hindroid detection system](htt
 
 ### HIN Construction
 Our heterogeneous information network contains 4 types of nodes which we define: 
-- \(Apps\): Android apps determined by name.
+- $Apps$: Android apps determined by name.
 - $APIs$: APIs determined by their smali representation, i.e. `Lpackage/Class;->method();V`
 - $Packages$: the package an API originates from.
 - $Methods$: Methods (or "functions") that API calls appear in.
