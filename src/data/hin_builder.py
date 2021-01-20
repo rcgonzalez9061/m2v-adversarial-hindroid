@@ -11,7 +11,7 @@ from gensim.models import Word2Vec
 from p_tqdm import p_umap
 
 
-def get_features(outfolder, walk_args=None, w2v_args=None):
+def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
     '''
     Implements metapath2vec by:
     1. Building a graph
@@ -31,11 +31,15 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
     app_heap_path = os.path.join('data', 'out', 'all-apps', 'app-data/')
     metapath_walk_outpath = os.path.join(outfolder, 'metapath_walk.json')
     
+    # build from preparsed data
+    if base_data is not None:
+        base_walks = os.path.join(base_data, 'metapath_walk.json')
+    
     # generate app list
     apps_df = pd.read_csv(app_list_path)
     app_data_list = app_heap_path + apps_df.app + '.csv'
     
-    if os.path.exists(graph_path):  # load graph from file if present
+    if os.path.exists(graph_path) and base_data is None:  # load graph from file if present
         with open(graph_path, 'rb') as file:
             g = pickle.load(file)
     else:  # otherwise build graph from data
@@ -54,6 +58,14 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
                 print(f'Indexing {label}s')
                 uid_map = data[label].unique().compute()
                 uid_map = uid_map.to_frame()
+                
+                if base_data is not None: # load base items
+                    base_items = pd.read_csv(
+                        os.path.join(base_data, label+'_map.csv'),
+                        usecols=[label]
+                    )
+                    uid_map = pd.concat([base_items, uid_map], ignore_index=True).drop_duplicates().reset_index(drop=True)
+                
                 uid_map['uid'] = label + pd.Series(uid_map.index).astype(str)
                 uid_map = uid_map.set_index(label)
                 uid_map.to_csv(os.path.join(outfolder, label+'_map.csv'))
@@ -83,13 +95,23 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
     # random walk on all apps, save to metapath_walk.json
     print('Performing random walks')
     rw = UniformRandomMetaPathWalk(g)
-    app_nodes = list(g.nodes()[g.nodes().str.contains('app')])
+#     app_nodes = list(g.nodes()[g.nodes().str.contains('app')])
+    app_nodes = list(
+        apps_df.app.map(
+            pd.read_csv(os.path.join(outfolder, 'app_map.csv'), index_col='app').uid
+        )
+    )
     
     def run_walks(metapath):
         return rw.run(app_nodes, n=1, length=walk_args['length'], metapaths=[metapath])
     
     metapaths = [walk_args['metapaths'][i%len(walk_args['metapaths'])] for i in range(len(walk_args['metapaths'])*walk_args['n'])]
     metapath_walks = np.concatenate(p_umap(run_walks, metapaths, num_cpus=walk_args['nprocs'])).tolist()
+    
+    if base_data is not None:  # if building from other data, append to walks
+        with open(base_walks, 'r') as mp_file:
+            metapath_walks.extend(json.load(mp_file))
+    
     with open(metapath_walk_outpath, 'w') as file:
         json.dump(metapath_walks, file)
     
