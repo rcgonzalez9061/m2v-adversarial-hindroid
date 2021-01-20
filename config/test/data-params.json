@@ -1,7 +1,9 @@
 {
-    "outfolder": "data/out/miniset",
+    "outfolder": "test/output",
     "parse_params": {
-        "nprocs": 16
+        "data_source": "test",
+        "nprocs": 2,
+        "recompute": true
     },
     "feature_params": {
         "walk_args": {
@@ -21,7 +23,7 @@
             "window": 5,
             "min_count": 0,
             "sg": 1,
-            "workers": 16,
+            "workers": 2,
             "iter": 5
         }
     }

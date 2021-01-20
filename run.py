@@ -9,11 +9,10 @@ sys.path.insert(0, 'src/model')
 sys.path.insert(0, 'src')
 
 from etl import run_etl
-# from app_parser import get_data
-# from hin_builder import get_features
 from analysis import generate_analysis
 from model import train
-from utils import convert_notebook#, run_tests
+from utils import convert_notebook
+from tester import run_tests
 
 def main(targets):
     '''
@@ -23,20 +22,8 @@ def main(targets):
     `main` runs the targets in order of data=>analysis=>model.
     '''
 
-#     if 'test' in targets:
-#         run_tests()
-    
-#     if 'parse-smali' in targets:
-#         with open('config/parse-params/parse-params.json') as fh:
-#             parse_cfg = json.load(fh)
-
-#         get_data(**parse_cfg)
-    
-#     if 'features' in targets:
-#         with open('config/feature-params/feature-params.json') as fh:
-#             feature_cfg = json.load(fh)
-
-#         get_features(**feature_cfg)
+    if 'test' in targets:
+        run_tests()
 
     if 'data' in targets:
         with open('config/etl-params/etl-params.json') as fh:

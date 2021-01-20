@@ -14,15 +14,20 @@ import plotly.graph_objs as go
 import plotly.io as pio
 
 
-def make_groundtruth_figures(data_folder, update_figs):
-    vectors = pd.read_csv(os.path.join(data_folder, 'features.csv'))
-    vectors = vectors.set_index('app')
+def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
+    vectors = pd.read_csv(os.path.join(data_folder, 'features.csv'), index_col='app')
     
-    all_apps = pd.read_csv("data/out/all-apps/all_apps.csv", index_col='app')
-    all_apps['label'] = all_apps[all_apps.category=='malware'].app_dir.str.split('/').apply(lambda list: list[5])
-    other_mal_map = {key: "Other malware" for key, value in all_apps.label.value_counts().items() if value <= 200}
-    all_apps.label = all_apps.label.map(other_mal_map).fillna(all_apps.label)
-    all_apps.label.fillna(all_apps.category, inplace=True)
+    if no_labels: # mostly for testing
+        all_apps = vectors.assign(
+            label=['app', 'app'],
+            category=['app', 'app']
+        )
+    else:
+        all_apps = pd.read_csv("data/out/all-apps/all_apps.csv", index_col='app')
+        all_apps['label'] = all_apps[all_apps.category=='malware'].app_dir.str.split('/').apply(lambda list: list[5])
+        other_mal_map = {key: "Other malware" for key, value in all_apps.label.value_counts().items() if value <= 200}
+        all_apps.label = all_apps.label.map(other_mal_map).fillna(all_apps.label)
+        all_apps.label.fillna(all_apps.category, inplace=True)
     
     vectors = vectors.assign(
         label=all_apps.label,
@@ -155,7 +160,7 @@ def make_groundtruth_figures(data_folder, update_figs):
         pio.write_html(fig, file=os.path.join('docs', '_includes', '3D-plot.html'), auto_open=True)
     
     
-def generate_analysis(data_path, update_figs=False, job_list=[]):
+def generate_analysis(data_path, update_figs=False, jobs=[]):
     "Generates plots, aggregates, and statistical analysis on app data located in `data_path`"
 
     #  load data
@@ -164,5 +169,5 @@ def generate_analysis(data_path, update_figs=False, job_list=[]):
 #     os.makedirs(out_folder, exist_ok=True)
 
     
-    if "plots" in job_list:
-        make_groundtruth_figures(data_path, update_figs)
+    if "plots" in jobs:
+        make_groundtruth_figures(data_path, **jobs['plots'])

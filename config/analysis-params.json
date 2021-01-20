@@ -1,5 +1,0 @@
-{
-    "data_path": "data/out/final_train/",
-    "job_list": ["summary", "comparison"],
-    "out_folder": "data/out/final_train/analysis"
-}

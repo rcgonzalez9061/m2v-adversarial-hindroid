@@ -24,6 +24,7 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
     w2v_args:       Arguments for gensim.models.Word2Vec
     '''   
     app_list_path = os.path.join(outfolder, 'app_list.csv')
+    nodes_path = os.path.join(outfolder, 'nodes.json')
     edge_path = os.path.join(outfolder, 'edges.csv')
     graph_path = os.path.join(outfolder, 'graph.pkl')
     feature_path = os.path.join(outfolder, 'features.csv')
@@ -40,7 +41,7 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
     else:  # otherwise build graph from data
         with Client() as client, performance_report(os.path.join(outfolder, "performance_report.html")):
             print(f"Dask Cluster: {client.cluster}")
-            print(f"Daskboard port: {client.scheduler_info()['services']['dashboard']}")
+            print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
             
             data = dd.read_csv(list(app_data_list), dtype=str)
             client.persist(data)
@@ -68,6 +69,10 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
                     edges['api'] = edges['api'].map(api_map)
                     edges.to_csv(edge_path, mode='a', index=False, header=False)
 
+            # save nodes to file
+            with open(nodes_path, 'wb') as file:
+                pickle.dump(nodes, file)
+            
             g = StellarGraph(nodes = nodes,
                              edges = pd.read_csv(edge_path))
 
@@ -83,7 +88,7 @@ def get_features(outfolder, walk_args=None, w2v_args=None):
     def run_walks(metapath):
         return rw.run(app_nodes, n=1, length=walk_args['length'], metapaths=[metapath])
     
-    metapaths = list(np.array(walk_args['metapaths']*walk_args['n'], dtype=object).flatten())
+    metapaths = [walk_args['metapaths'][i%len(walk_args['metapaths'])] for i in range(len(walk_args['metapaths'])*walk_args['n'])]
     metapath_walks = np.concatenate(p_umap(run_walks, metapaths, num_cpus=walk_args['nprocs'])).tolist()
     with open(metapath_walk_outpath, 'w') as file:
         json.dump(metapath_walks, file)
