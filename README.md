@@ -1,3 +1,5 @@
+![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/rcgonzal/m2v-adversarial-hindroid)
+
 # m2vDroid: Perturbation-resilient metapath-based Android Malware Detection
 An extension of the [HinDroid malware detection system](https://www.cse.ust.hk/~yqsong/papers/2017-KDD-HINDROID.pdf), but using [metapath2vec](https://ericdongyx.github.io/metapath2vec/m2v.html) to encode apps in the Heterogeneous Information Network. We then hope to make the model resilient to adversarial ML like Android HIV. See our [blog post](https://rcgonzalez9061.github.io/m2v-adversarial-hindroid/) for more details on our methods.
 
