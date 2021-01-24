@@ -102,11 +102,10 @@ def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
         )
     )
     
-    def run_walks(metapath):
-        return rw.run(app_nodes, n=1, length=walk_args['length'], metapaths=[metapath])
-    
-    metapaths = [walk_args['metapaths'][i%len(walk_args['metapaths'])] for i in range(len(walk_args['metapaths'])*walk_args['n'])]
-    metapath_walks = np.concatenate(p_umap(run_walks, metapaths, num_cpus=walk_args['nprocs'])).tolist()
+#     def run_walks(app):
+#         return rw.run([app], n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
+#     metapath_walks = np.concatenate(p_umap(run_walks, app_nodes, num_cpus=walk_args['nprocs'])).tolist()
+    metapath_walks = rw.run(app_nodes, n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
     
     if base_data is not None:  # if building from other data, append to walks
         with open(base_walks, 'r') as mp_file:

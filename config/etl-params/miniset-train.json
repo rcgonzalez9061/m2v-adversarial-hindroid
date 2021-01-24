@@ -1,12 +1,12 @@
 {
-    "outfolder": "data/out/random-apps",
+    "outfolder": "data/out/miniset-train",
     "parse_params": {
         "nprocs": 16
     },
     "feature_params": {
         "walk_args": {
             "nprocs": 16,
-            "length": 100,
+            "length": 60,
             "n": 3,
             "metapaths": [
                 ["app", "api", "app"],

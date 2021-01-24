@@ -20,6 +20,7 @@
             "size": 128,
             "window": 5,
             "min_count": 0,
+            "negative": 5,
             "sg": 1,
             "workers": 16,
             "iter": 5
