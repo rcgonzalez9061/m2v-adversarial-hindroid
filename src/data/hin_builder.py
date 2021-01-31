@@ -1,14 +1,18 @@
 from dask.distributed import Client, LocalCluster, performance_report
 import dask.dataframe as dd
+
+from stellargraph import StellarGraph, IndexedArray
+from stellargraph.data import UniformRandomMetaPathWalk
+
+from gensim.models import Word2Vec
+
 import os
 import pandas as pd
 import numpy as np
 import pickle
 import json
-from stellargraph import StellarGraph, IndexedArray
-from stellargraph.data import UniformRandomMetaPathWalk
-from gensim.models import Word2Vec
 from p_tqdm import p_umap
+from shutil import copyfile
 
 
 def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
@@ -52,8 +56,17 @@ def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
             
             nodes = {}
             api_map = None
+            
+            # setup edges.csv
+            if base_data is not None:
+                print(f"Copying {os.path.join(base_data, 'edges.csv')}")
+                copyfile(
+                    os.path.join(base_data, 'edges.csv'),
+                    os.path.join(outfolder, 'edges.csv')
+                )
+            else:
+                pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
 
-            pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
             for label in ['api', 'app', 'method', 'package']:
                 print(f'Indexing {label}s')
                 uid_map = data[label].unique().compute()

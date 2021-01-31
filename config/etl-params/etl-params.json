@@ -1,14 +1,14 @@
 {
-    "outfolder": "data/out/miniset-test",
+    "outfolder": "data/out/test-sample",
     "parse_params": {
-        "nprocs": 16
+        "nprocs": 16,
+        "recompute": true
     },
     "feature_params": {
-        "base_data": "data/out/miniset-train",
         "walk_args": {
             "nprocs": 16,
-            "length": 60,
-            "n": 3,
+            "length": 100,
+            "n": 1,
             "metapaths": [
                 ["app", "api", "app"],
                 ["app", "api", "method", "api", "app"],

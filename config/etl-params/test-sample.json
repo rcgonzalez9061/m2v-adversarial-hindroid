@@ -11,7 +11,10 @@
             "n": 1,
             "metapaths": [
                 ["app", "api", "app"],
-                ["app", "api", "method", "api", "app"]
+                ["app", "api", "method", "api", "app"],
+                ["app", "api", "package", "api", "app"],
+                ["app", "api", "package", "api", "method", "api", "app"],
+                ["app", "api", "method", "api", "package", "api", "app"]
             ]
         },
         "w2v_args": {
