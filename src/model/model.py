@@ -5,62 +5,47 @@ from sklearn.svm import SVC
 import numpy as np
 import pandas as pd
 
-def make_char_array(charlist):
-    charr=[]
-    this_arr=charlist
-    i=0
-    while i<len(this_arr):
-        if this_arr[i]!="^":
-            charr.append(this_arr[i])
-            i+=1
-        else:
-            charr[-1]+="".join(this_arr[i:i+2])
-            i+=2
-    return charr
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import classification_report, f1_score
 
-def train_svm(data_path, commuting_matrix, c, Kernel, Degree, outpath):
-    train_path=os.path.join(data_path, "final_train")
+def create_model(outfolder, app_path):
+    model_path = os.path.join(outfolder, 'model.pkl')
     
-    A_train=load_npz(os.path.join(train_path, "A_mat.npz")).astype(np.int64)
-    B_train=load_npz(os.path.join(train_path, "B_mat.npz")).astype(np.int64)
-        
-    train_app_data=pd.read_csv(os.path.join(train_path, "app_data.csv"))
-    
-    metapath_dict={
-        "A":A_train,
-        "B":B_train,
-        "A^T":A_train.T,
-        "B^T":B_train.T
-    }
-        
-    char_arr=make_char_array(list(commuting_matrix))
+    all_apps = pd.read_csv("data/out/all-apps/all_apps.csv", index_col='app')
+    test_apps = pd.read_csv(app_path, index_col = 'app')
+    test_apps_mal = test_apps.join(all_apps, how = 'left')
 
-    X_train=metapath_dict[char_arr[0]]
-    y_train=np.array(train_app_data.app.apply(lambda x:1 if '.' in x else 0))
-    
-    for i in range(len(char_arr)):
-        if i!=0:
-            X_train=X_train*metapath_dict[char_arr[i]]    
-    
-    mdl = SVC(kernel=Kernel, C=c, degree=Degree).fit(X_train.todense(), y_train)
+    all_apps_features =  pd.read_csv('data/out/all-apps/features.csv', index_col='uid')
+    all_apps_features['app'] = all_apps_features.index.map(
+        pd.read_csv('data/out/all-apps/app_map.csv', index_col='uid').app
+    )
+    all_apps_features['malware'] = (all_apps_features['app'].map(all_apps.category)=='malware').astype(int)
+    all_apps_features['category'] = all_apps_features.app.map(all_apps.category)
 
-    if outpath is not None:
-        try:
-            print(os.getcwd())
-            fn="svm_model_%s.pkl"%commuting_matrix.lower().replace("^","")
-            fp=os.path.join(os.getcwd(),outpath, fn)
-            print("Saving Model to %s"%fp)
-            with open(fp, 'wb') as output:
-                pickle.dump(mdl, output)
-        except FileNotFoundError:
-            fn="svm_model_%s.pkl"%commuting_matrix.lower().replace("^","")
-            os.makedirs(outpath)
-            fp=os.path.join(os.getcwd(),outpath, fn)
-            print("Saving Model to %s"%fp)
-            with open(fp, 'wb') as output:
-                pickle.dump(mdl, output)
+    train = pd.read_csv('data/out/training-sample/app_map.csv', usecols=['app'])
+    train = all_apps_features.set_index('app').loc[train.app]
 
-def train(data_path, commuting_matrices, c, Kernel, Degree, outpath=None):
-    for matrix in commuting_matrices:
-        print("Making model from commuting matrix %s"%matrix)
-        train_svm(data_path, matrix, c, Kernel, Degree, outpath)
+    test_sample = all_apps_features[np.logical_not(
+        all_apps_features.app.apply(lambda x: x in train.index)
+    )]
+    test_sample['category'] = test_sample.app.map(all_apps.category)
+    test_sample = test_sample[test_sample.category!='random-apps']
+
+
+
+    X_train, y_train = train.drop(columns=['malware', 'category']), train.malware
+    X_test, y_test = test_sample.drop(columns=['app', 'malware', 'category']), test_sample.malware
+
+
+    model = RandomForestClassifier(max_depth=3, n_jobs=-1)  # probably overfit
+    model.fit(X_train, y_train)
+
+    class_train = classification_report(model.predict(X_train), y_train)
+    class_test = classification_report(model.predict(X_test), y_test)
+    output = test_sample[['app','malware','category']].join(y_test, how = 'left')
+    m_score = f1_score(model.predict(X_test), y_test)
+    output.to_csv('output.csv')
+    with open(model_path, 'wb') as file:
+            pickle.dump(class_train, file)
+            pickle.dump(class_test,file)
+            pickle.dump(m_score,file)
