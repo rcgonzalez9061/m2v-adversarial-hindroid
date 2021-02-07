@@ -43,6 +43,9 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
     transform = TSNE  # PCA
 
     # 2D plot -- matplotlib
+    print('Making 2D plot...')
+    plt.rcParams.update({'font.size': 22})
+    
     trans = transform(n_components=2)
     node_embeddings_2d = trans.fit_transform(node_embeddings)
     label_map = {l: i for i, l in enumerate(np.unique(node_targets))}
@@ -57,12 +60,15 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
         cmap='tab10',
         alpha=0.3
     )
-    plt.title("{} visualization of node embeddings".format(transform.__name__))
-    legend1 = plt.legend(scatter.legend_elements()[0], label_map.keys(),
-                        loc="upper right", title="Classes")
+    plt.title("2D {} visualization of node embeddings".format(transform.__name__))
+    legend1 = plt.legend(scatter.legend_elements()[0], pd.Series(label_map.keys()).str.replace('-', ' ').str.title(),
+                        loc='center left', bbox_to_anchor=(1, 0.5), title="Classes", markerscale=2)
+    for lh in legend1.legendHandles:
+         lh.set_alpha(1)
     plt.savefig(os.path.join(data_folder, '2D-plot.png'))
     
     # 3D plot - using plotly
+    print('Making 3D plot...')
     trans3d = transform(n_components=3)
     node_embeddings_3d = trans3d.fit_transform(node_embeddings)
     data_3d = pd.DataFrame(node_embeddings_3d, index=vectors.index)
@@ -121,10 +127,10 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
             size = 2
         else:
             symbol = 'x'
-            group='Non-Malware'
+            group='Unlabeled'
             size = 1.5
 
-        name = f"{group}, {row['type']}"
+        name = f"{group}, {row['type'].replace('-', ' ').title()}"
 
         if row['type']=='Other malware':
             name=row['type']
@@ -160,7 +166,7 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
         pio.write_html(fig, file=os.path.join('docs', '_includes', '3D-plot.html'), auto_open=True)
     
     
-def generate_analysis(data_path, update_figs=False, jobs=[]):
+def generate_analysis(data_path, jobs={}):
     "Generates plots, aggregates, and statistical analysis on app data located in `data_path`"
 
     #  load data

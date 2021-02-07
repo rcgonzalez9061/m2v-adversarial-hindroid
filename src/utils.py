@@ -7,38 +7,6 @@ from scipy.sparse import load_npz
 import os
 import pandas as pd
 
-# class UIDMapper():
-#     '''
-#     Maps keys to a unique identifer with a given prefix.
-#     '''
-#     def __init__(self, prefix, initial_dict=None):
-#         self.prefix = prefix
-#         if initial_dict is not None:
-#             self.dict = initial_dict
-#         else:
-#             self.dict = dict()
-        
-#     def __next_uid(self):
-#         return self.prefix + str(len(self.dict))
-    
-#     def add(self, k):
-#         if k not in self.dict:
-#             self.dict[k] = self.__next_uid()
-
-#     def __getitem__(self, k):
-#         if k not in self.dict:
-#             self.dict[k] = self.__next_uid()
-#         return self.dict[k]
-
-#     def __len__(self):
-#         return len(self.dict)
-    
-#     def __repr__(self):
-#         return repr(self.dict)
-    
-#     def __str__(self):
-#         return str(self.dict)
-
     
 def save_dict(d, path):
     '''

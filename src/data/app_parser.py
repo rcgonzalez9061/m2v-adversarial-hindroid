@@ -11,7 +11,7 @@ from p_tqdm import p_umap
 
 
 API_DATA_COLUMNS =  ["app", "api", "invoke_type", "class", "method", "package", "context"]
-PACKAGE_CLEANING_PATTERN = r"\/[^/]+;->.*"
+PACKAGE_CLEANING_PATTERN = r"[$;].*"
 
 class Application():
     """

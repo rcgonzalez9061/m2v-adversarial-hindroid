@@ -10,7 +10,7 @@ sys.path.insert(0, 'src')
 
 from etl import run_etl
 from analysis import generate_analysis
-from model import train
+# from model import train
 from utils import convert_notebook
 from tester import run_tests
 

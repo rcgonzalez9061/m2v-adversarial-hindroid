@@ -18,7 +18,7 @@
         },
         "w2v_args": {
             "size": 128,
-            "window": 5,
+            "window": 7,
             "min_count": 0,
             "negative": 5,
             "sg": 1,
