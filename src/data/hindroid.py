@@ -98,22 +98,27 @@ def make_models(source_folder, svm_args={}):
     
     source_folder = os.path.join(source_folder, 'hindroid')
     metapath_map = {
-        'AAT': 'A * A.T',
-        'ABAT': 'A * B * A.T',
-        'APAT': 'A * P * A.T',
-        'ABPBTAT': 'A * B * P * B.T *  A.T',
-        'APBPTAT': 'A * P * B * P.T *  A.T',
+        'AAT': 'A_ * A.T',
+        'ABAT': 'A_ * B * A.T',
+        'APAT': 'A_ * P * A.T',
+        'ABPBTAT': 'A_ * B * P * B.T *  A.T',
+        'APBPTAT': 'A_ * P * B * P.T *  A.T',
     }
     
-    A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz'))
-    B = sparse.load_npz(os.path.join(source_folder, 'B_mat.npz'))
-    P = sparse.load_npz(os.path.join(source_folder, 'P_mat.npz'))
+    A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz')).astype('uint32')
+    B = sparse.load_npz(os.path.join(source_folder, 'B_mat.npz')).astype('i1').tocsr()
+    P = sparse.load_npz(os.path.join(source_folder, 'P_mat.npz')).astype('i1').tocsr()
     
     metrics = pd.DataFrame(columns = ['kernel', 'acc', 'recall', 'f1'])
     
     for metapath, formula in metapath_map.items():
         print(f'Fitting {metapath} model...')
-        commuting_matrix = eval(formula)
+        commuting_matrix = []
+        for i in range(a.shape[0]):
+            A_ = A[i]
+            commuting_matrix.append(eval(formula))
+        commuting_matrix = sparse.vstack(commuting_matrix, format='csr')
+        
         sparse.save_npz(os.path.join(source_folder, f'{metapath}.npz'), commuting_matrix)
         
         mdl = SVC(**svm_args)
@@ -164,51 +169,4 @@ def load_apps(source_folder):
     apps = apps.reset_index().set_index(apps.uid.str.replace('app', '').astype(int)).sort_index()
     apps['label'] = (apps.category=='malware').astype(int)
     return apps
-
-def set_row_csr(A, row_idx, new_row):
-    '''
-    SOURCE: https://stackoverflow.com/questions/28427236/set-row-of-csr-matrix
-    Replace a row in a CSR sparse matrix A.
-
-    Parameters
-    ----------
-    A: csr_matrix
-        Matrix to change
-    row_idx: int
-        index of the row to be changed
-    new_row: np.array
-        list of new values for the row of A
-
-    Returns
-    -------
-    None (the matrix A is changed in place)
-
-    Prerequisites
-    -------------
-    The row index shall be smaller than the number of rows in A
-    The number of elements in new row must be equal to the number of columns in matrix A
-    '''
-    assert sparse.isspmatrix_csr(A), 'A shall be a csr_matrix'
-    assert row_idx < A.shape[0], \
-            'The row index ({0}) shall be smaller than the number of rows in A ({1})' \
-            .format(row_idx, A.shape[0])
-    try:
-        N_elements_new_row = len(new_row)
-    except TypeError:
-        msg = 'Argument new_row shall be a list or numpy array, is now a {0}'\
-        .format(type(new_row))
-        raise AssertionError(msg)
-    N_cols = A.shape[1]
-    assert N_cols == N_elements_new_row, \
-            'The number of elements in new row ({0}) must be equal to ' \
-            'the number of columns in matrix A ({1})' \
-            .format(N_elements_new_row, N_cols)
-
-    idx_start_row = A.indptr[row_idx]
-    idx_end_row = A.indptr[row_idx + 1]
-    additional_nnz = N_cols - (idx_end_row - idx_start_row)
-
-    A.data = np.r_[A.data[:idx_start_row], new_row, A.data[idx_end_row:]]
-    A.indices = np.r_[A.indices[:idx_start_row], np.arange(N_cols), A.indices[idx_end_row:]]
-    A.indptr = np.r_[A.indptr[:row_idx + 1], A.indptr[(row_idx + 1):] + additional_nnz]
     

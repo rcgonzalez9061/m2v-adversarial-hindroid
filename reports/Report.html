@@ -14323,7 +14323,7 @@ a.anchor-link {
 
 </div>
 <div class="jp-Cell-inputWrapper"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<h2 id="ADVERSARIAL-ATTACK">ADVERSARIAL ATTACK<a class="anchor-link" href="#ADVERSARIAL-ATTACK">&#182;</a></h2><p>Our adversarial attack follows many of the techniques applied by Chen, et al. 2018 to attack the MaMaDroid and Drebin models. To perform our adversarial attack, we simulated <em>Scenerio FB</em> with the following conditions: we have blackbox access to a malware classifier so we may query it to predict examples as they are generated and we also have access to the feature set with which to input into the classifier. The classifier may vary between m2vDroid and different kernels of HinDroid for initial benchmarks, but we will primarily use the m2vDroid classifier once we begin recursive training. The feature set will be the set of APIS derived from our training app set. The input vector will be the one-hot-encoded set of APIs for the example app. Our goal is to have the adversarial model add APIs to the example until it is misclassified or we reach a maximum. We want the app to retain its original function, so no APIs can be removed. Therefore, we modified the C&amp;W attack from Android HIV.</p>
+<h2 id="ADVERSARIAL-ATTACK">ADVERSARIAL ATTACK<a class="anchor-link" href="#ADVERSARIAL-ATTACK">&#182;</a></h2><p>Our adversarial attack follows many of the techniques applied by Chen, et al. 2018 to attack the MaMaDroid and Drebin models. To perform our adversarial attack, we simulated <em>Scenerio FB</em> with the following conditions: we have blackbox access to a malware classifier so we may query it to predict examples as they are generated and we also have access to the feature set with which to input into the classifier. The classifier may vary between m2vDroid and different kernels of HinDroid for initial benchmarks, but we will primarily use the m2vDroid classifier once we begin recursive training. The feature set will be the set of APIS derived from our training app set. The input vector will be the one-hot-encoded set of APIs for the example app. Our goal is to have the adversarial model add APIs to the example until it is misclassified or we reach a maximum. We want the app to retain its original function, so no APIs can be removed. Therefore, we modified the C&amp;W attack from Android HIV to fit our application.</p>
 <p><em>To be expanded in the future...</em></p>
 
 </div>
@@ -14346,118 +14346,68 @@ a.anchor-link {
 </div>
 </div>
 <div class="jp-Cell-inputWrapper"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Intial performance:</p>
+<p>Intial performance (Note: Hindroid was trained/tested on the full dataset due to time limitations):</p>
 
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell  jp-mod-noInput ">
-
-<div class="jp-Cell-outputWrapper">
-
-<div class="jp-OutputArea jp-Cell-outputArea">
-
-<div class="jp-OutputArea-child">
-
-
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html">
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>acc</th>
-      <th>recall</th>
-      <th>f1</th>
-      <th>TP</th>
-      <th>TN</th>
-      <th>FP</th>
-      <th>FN</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>m2vDroid</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>AA^T</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>ABA^T</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>APA^T</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>ABPB^TA^T</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>APBP^TA^T</th>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-    </tr>
-  </tbody>
+</div>
+<div class="jp-Cell-inputWrapper"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<table>
+<thead><tr>
+<th>Model</th>
+<th>acc</th>
+<th>recall</th>
+<th>f1</th>
+<th>TP</th>
+<th>TN</th>
+<th>FP</th>
+<th>FN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>m2vDroid</td>
+<td>0.923</td>
+<td>0.994</td>
+<td>0.959</td>
+<td>1829</td>
+<td>21</td>
+<td>144</td>
+<td>10</td>
+</tr>
+<tr>
+<td>AA^T</td>
+<td>0.983</td>
+<td>0.994</td>
+<td>0.990</td>
+<td>5488</td>
+<td>484</td>
+<td>72</td>
+<td>28</td>
+</tr>
+<tr>
+<td>ABA^T</td>
+<td>0.876</td>
+<td>0.944</td>
+<td>0.932</td>
+<td>5208</td>
+<td>113</td>
+<td>443</td>
+<td>308</td>
+</tr>
+<tr>
+<td>APA^T</td>
+<td>0.982</td>
+<td>0.994</td>
+<td>0.990</td>
+<td>5488</td>
+<td>479</td>
+<td>77</td>
+<td>28</td>
+</tr>
+</tbody>
 </table>
-</div>
-</div>
 
 </div>
-
-</div>
-
-</div>
-
 </div>
 <div class="jp-Cell-inputWrapper"><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <h2 id="REFERENCES">REFERENCES<a class="anchor-link" href="#REFERENCES">&#182;</a></h2><h2 id="APPENDIX">APPENDIX<a class="anchor-link" href="#APPENDIX">&#182;</a></h2><h3 id="Original-Proposal">Original Proposal<a class="anchor-link" href="#Original-Proposal">&#182;</a></h3><p>The data that will be used to build our model is benign and malignant android applications, which
