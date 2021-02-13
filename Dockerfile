@@ -8,7 +8,8 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y default-jre && \
     apt-get install -y default-jdk && \
-    apt-get install -y software-properties-common
+    apt-get install -y software-properties-common && \
+    apt-get install -y intel-mkl-full
 
 ENV APK_SCRIPT https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
 ENV APK_JAR https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.4.1.jar
@@ -61,5 +62,5 @@ RUN P=/tmp/$(basename $APK_JAR) && \
 #     libnvinfer-plugin7=7.1.3-1+cuda11.0
 
 # Additional py packages
-RUN pip install stellargraph p_tqdm jekyllnb adversarial-robustness-toolbox
+RUN pip install stellargraph p_tqdm jekyllnb adversarial-robustness-toolbox sparse-dot-mkl
     
