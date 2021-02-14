@@ -25,5 +25,8 @@
             "workers": 16,
             "iter": 5
         }
+    },
+    "hindroid_params": {
+        "redo": true
     }
 }

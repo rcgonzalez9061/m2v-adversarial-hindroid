@@ -1,9 +1,10 @@
 {
-    "outfolder": "data/out/all-apps",
+    "outfolder": "data/out/miniset-train",
     "parse_params": {
         "nprocs": 16
     },
     "feature_params": {
+        "redo": false,
         "walk_args": {
             "nprocs": 16,
             "length": 60,
@@ -25,5 +26,8 @@
             "workers": 16,
             "iter": 5
         }
+    },
+    "hindroid_params": {
+        "redo": true
     }
 }

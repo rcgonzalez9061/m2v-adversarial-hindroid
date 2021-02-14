@@ -6,6 +6,7 @@
         "recompute": true
     },
     "feature_params": {
+        "redo": true,
         "walk_args": {
             "nprocs": 16,
             "length": 60,
@@ -26,5 +27,8 @@
             "workers": 2,
             "iter": 5
         }
+    },
+    "hindroid_params": {
+        "redo": true
     }
 }

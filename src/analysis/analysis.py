@@ -25,7 +25,10 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
     else:
         all_apps = pd.read_csv("data/out/all-apps/all_apps.csv", index_col='app')
         all_apps['label'] = all_apps[all_apps.category=='malware'].app_dir.str.split('/').apply(lambda list: list[5])
-        other_mal_map = {key: "Other malware" for key, value in all_apps.label.value_counts().items() if value <= 200}
+        top_9_malware = all_apps.label.value_counts().sort_values(ascending=False)[:9]
+        top_9_min = top_9_malware.min()
+        other_mal_map = {key: "Other malware" for key, value in all_apps.label.value_counts().items() if value <= top_9_min}
+#         other_mal_map = {key: key for key, value in all_apps.label.value_counts().items() if value <= 200}
         all_apps.label = all_apps.label.map(other_mal_map).fillna(all_apps.label)
         all_apps.label.fillna(all_apps.category, inplace=True)
     
@@ -40,32 +43,36 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
     node_embeddings = vectors.drop(columns=['uid', 'category', 'label'])
     node_targets = labels
 
-    transform = TSNE  # PCA
+    transform = TSNE  # Dimensionality reduction transformer
 
     # 2D plot -- matplotlib
     print('Making 2D plot...')
-    plt.rcParams.update({'font.size': 22})
+    plt.rcParams.update({'font.size': 14})
     
     trans = transform(n_components=2)
     node_embeddings_2d = trans.fit_transform(node_embeddings)
     label_map = {l: i for i, l in enumerate(np.unique(node_targets))}
     node_colours = [label_map[target] for target in node_targets]
 
-    plt.figure(figsize=(20, 16))
+    plt.figure(figsize=(10, 8))
     plt.axes().set(aspect="equal")
     scatter = plt.scatter(
         node_embeddings_2d[:, 0],
         node_embeddings_2d[:, 1],
         c=node_colours,
-        cmap='tab10',
-        alpha=0.3
+        cmap='tab20',
+        alpha=1,
+        s=5
     )
     plt.title("2D {} visualization of node embeddings".format(transform.__name__))
     legend1 = plt.legend(scatter.legend_elements()[0], pd.Series(label_map.keys()).str.replace('-', ' ').str.title(),
-                        loc='center left', bbox_to_anchor=(1, 0.5), title="Classes", markerscale=2)
-    for lh in legend1.legendHandles:
-         lh.set_alpha(1)
-    plt.savefig(os.path.join(data_folder, '2D-plot.png'))
+                        loc='center left', bbox_to_anchor=(1, 0.5), title="App Type", markerscale=1.5)
+    # order labels (https://stackoverflow.com/a/46160465/13710014)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    order = ['Popular Apps', 'Random Apss'] + list(top_9_malware.index)
+    plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+    
+    plt.savefig(os.path.join(data_folder, '2D-plot.png'), bbox_inches='tight')
     
     # 3D plot - using plotly
     print('Making 3D plot...')

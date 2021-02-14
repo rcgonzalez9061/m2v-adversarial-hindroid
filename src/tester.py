@@ -4,7 +4,10 @@ import shutil
 
 from etl import run_etl
 from analysis import generate_analysis
+import tensorflow as tf
 # from model import model
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def run_tests():
     print("-----RUNNING TESTS-----")

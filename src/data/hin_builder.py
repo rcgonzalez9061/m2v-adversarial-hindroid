@@ -15,7 +15,7 @@ from p_tqdm import p_umap
 from shutil import copyfile
 
 
-def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
+def get_features(outfolder, walk_args=None, w2v_args=None, redo=False):
     '''
     Implements metapath2vec by:
     1. Building a graph
@@ -35,97 +35,36 @@ def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
     app_heap_path = os.path.join('data', 'out', 'all-apps', 'app-data/')
     metapath_walk_outpath = os.path.join(outfolder, 'metapath_walk.json')
     
-    # build from preparsed data
-    if base_data is not None:
-        base_walks = os.path.join(base_data, 'metapath_walk.json')
-    
     # generate app list
     apps_df = pd.read_csv(app_list_path)
     app_data_list = app_heap_path + apps_df.app + '.csv'
     
-    if os.path.exists(graph_path) and base_data is None:  # load graph from file if present
+    if os.path.exists(graph_path) and not redo:  # load graph from file if present
         with open(graph_path, 'rb') as file:
             g = pickle.load(file)
-    else:  # otherwise build graph from data
-        with Client() as client, performance_report(os.path.join(outfolder, "performance_report.html")):
-            print(f"Dask Cluster: {client.cluster}")
-            print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
-            
-            data = dd.read_csv(list(app_data_list), dtype=str)
-            client.persist(data)
-            
-            nodes = {}
-            api_map = None
-            
-            # setup edges.csv
-            if base_data is not None:
-                print(f"Copying {os.path.join(base_data, 'edges.csv')}")
-                copyfile(
-                    os.path.join(base_data, 'edges.csv'),
-                    os.path.join(outfolder, 'edges.csv')
-                )
-            else:
-                pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
-
-            for label in ['api', 'app', 'method', 'package']:
-                print(f'Indexing {label}s')
-                uid_map = data[label].unique().compute()
-                uid_map = uid_map.to_frame()
-                
-                if base_data is not None: # load base items
-                    base_items = pd.read_csv(
-                        os.path.join(base_data, label+'_map.csv'),
-                        usecols=[label]
-                    )
-                    uid_map = pd.concat([base_items, uid_map], ignore_index=True).drop_duplicates().reset_index(drop=True)
-                
-                uid_map['uid'] = label + pd.Series(uid_map.index).astype(str)
-                uid_map = uid_map.set_index(label)
-                uid_map.to_csv(os.path.join(outfolder, label+'_map.csv'))
-                nodes[label] = IndexedArray(index=uid_map.uid.values)
-
-                # get edges if not api
-                if label == 'api':
-                    api_map = uid_map.uid  # create api map
-                else:
-                    print(f'Finding {label}-api edges')
-                    edges = data[[label, 'api']].drop_duplicates().compute()
-                    edges[label] = edges[label].map(uid_map.uid)
-                    edges['api'] = edges['api'].map(api_map)
-                    edges.to_csv(edge_path, mode='a', index=False, header=False)
-
-            # save nodes to file
-            with open(nodes_path, 'wb') as file:
-                pickle.dump(nodes, file)
-            
-            g = StellarGraph(nodes = nodes,
-                             edges = pd.read_csv(edge_path))
+    else:                                        # otherwise compute from data
+        g = build_graph(outfolder, app_data_list, nodes_path, edge_path)
 
     # save graph to file
     with open(graph_path, 'wb') as file:
         pickle.dump(g, file)
-    
-    # random walk on all apps, save to metapath_walk.json
-    print('Performing random walks')
-    rw = UniformRandomMetaPathWalk(g)
-#     app_nodes = list(g.nodes()[g.nodes().str.contains('app')])
-    app_nodes = list(
-        apps_df.app.map(
-            pd.read_csv(os.path.join(outfolder, 'app_map.csv'), index_col='app').uid
+
+    if os.path.exists(metapath_walk_outpath) and not redo:  # load graph from file if present
+        with open(metapath_walk_outpath, 'r') as file:
+            metapath_walks = json.load(file)
+    else:                                        # otherwise compute from data
+        # random walk on all apps, save to metapath_walk.json
+        print('Performing random walks')
+        rw = UniformRandomMetaPathWalk(g)
+        app_nodes = list(
+            apps_df.app.map(
+                pd.read_csv(os.path.join(outfolder, 'app_map.csv'), index_col='app').uid
+            )
         )
-    )
-    
-#     def run_walks(app):
-#         return rw.run([app], n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
-#     metapath_walks = np.concatenate(p_umap(run_walks, app_nodes, num_cpus=walk_args['nprocs'])).tolist()
-    metapath_walks = rw.run(app_nodes, n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
-    
-    if base_data is not None:  # if building from other data, append to walks
-        with open(base_walks, 'r') as mp_file:
-            metapath_walks.extend(json.load(mp_file))
-    
-    with open(metapath_walk_outpath, 'w') as file:
-        json.dump(metapath_walks, file)
+        metapath_walks = rw.run(app_nodes, n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
+        
+        with open(metapath_walk_outpath, 'w') as file:
+            json.dump(metapath_walks, file)
     
     print('Running Word2vec')
     w2v = Word2Vec(metapath_walks, **w2v_args)
@@ -137,3 +76,50 @@ def get_features(outfolder, walk_args=None, w2v_args=None, base_data=None):
     )
     features = features[features.uid.str.contains('app')].set_index('uid')
     features.to_csv(feature_path)
+
+def build_graph(outfolder, app_data_list, nodes_path, edge_path):
+    with Client() as client, performance_report(os.path.join(outfolder, "performance_report.html")):
+        print(f"Dask Cluster: {client.cluster}")
+        print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
+
+        data = dd.read_csv(list(app_data_list), dtype=str)
+        client.persist(data)
+
+        nodes = {}
+        api_map = None
+
+        # setup edges.csv
+        pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
+
+        for label in ['api', 'app', 'method', 'package']:
+            print(f'Indexing {label}s')
+            uid_map = data[label].unique().compute()
+            uid_map = uid_map.to_frame()
+
+#             if base_data is not None: # load base items
+#                 base_items = pd.read_csv(
+#                     os.path.join(base_data, label+'_map.csv'),
+#                     usecols=[label]
+#                 )
+#                 uid_map = pd.concat([base_items, uid_map], ignore_index=True).drop_duplicates().reset_index(drop=True)
+
+            uid_map['uid'] = label + pd.Series(uid_map.index).astype(str)
+            uid_map = uid_map.set_index(label)
+            uid_map.to_csv(os.path.join(outfolder, label+'_map.csv'))
+            nodes[label] = IndexedArray(index=uid_map.uid.values)
+
+            # get edges if not api
+            if label == 'api':
+                api_map = uid_map.uid  # create api map
+            else:
+                print(f'Finding {label}-api edges')
+                edges = data[[label, 'api']].drop_duplicates().compute()
+                edges[label] = edges[label].map(uid_map.uid)
+                edges['api'] = edges['api'].map(api_map)
+                edges.to_csv(edge_path, mode='a', index=False, header=False)
+
+        # save nodes to file
+        with open(nodes_path, 'wb') as file:
+            pickle.dump(nodes, file)
+
+        return StellarGraph(nodes = nodes, edges = pd.read_csv(edge_path))

@@ -16,6 +16,8 @@ from scipy import sparse
 from itertools import combinations, product
 from functools import partial
 import csv
+from sparse_dot_mkl import dot_product_mkl
+
 
 def dask_prep(edges_path, client):
     print(f"Dask Cluster: {client.cluster}")
@@ -40,7 +42,14 @@ def dask_prep(edges_path, client):
     api_package_edges = api_package_edges.groupby('source').target.unique().compute()
     api_package_edges[api_package_edges.apply(len)>1].to_pickle('data/temp/package_api_sets.pkl')
 
-def build_matrices(outfolder, base_data=None):
+def build_from_folder(outfolder, redo=False):
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'P_mat.npz')) or redo:
+        build_martices(outfolder)
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'APBPTAT.mdl')) or redo:
+        make_models(outfolder)
+    return
+
+def build_martices(outfolder):
     os.makedirs(os.path.join(outfolder, 'hindroid'), exist_ok=True)
 
     edges_path = os.path.join(outfolder, 'edges.csv')
@@ -77,8 +86,6 @@ def build_matrices(outfolder, base_data=None):
     P_mat = build_BP_mat(pd.read_pickle('data/temp/package_api_sets.pkl'), num_apis)
     print(f'Constructed: {repr(P_mat)}')
     sparse.save_npz(os.path.join(outfolder, 'hindroid', 'P_mat.npz'), P_mat.astype('int'))
-    
-    return (A_mat, B_mat, P_mat)
 
 def build_BP_mat(api_sets, num_apis):
     comb_func = lambda api_list: np.array(list(combinations(api_list, r=2)))
@@ -93,35 +100,36 @@ def build_BP_mat(api_sets, num_apis):
     mat += mat.T
     return mat
 
-def make_models(source_folder, svm_args={}):
+def make_models(source_folder):
+    print('Fitting models:')
     apps = load_apps(source_folder)
     
     source_folder = os.path.join(source_folder, 'hindroid')
     metapath_map = {
-        'AAT': 'A_ * A.T',
-        'ABAT': 'A_ * B * A.T',
-        'APAT': 'A_ * P * A.T',
-        'ABPBTAT': 'A_ * B * P * B.T *  A.T',
-        'APBPTAT': 'A_ * P * B * P.T *  A.T',
-    }
+            'AAT': 'dot_product_mkl(A_, A.T)',
+            'ABAT': 'dot_product_mkl(dot_product_mkl(A_, B), A.T)',
+            'APAT': 'dot_product_mkl(dot_product_mkl(A_, P), A.T)',
+            'ABPBTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, B), P), B.T), A.T)',
+            'APBPTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, P), B), P.T), A.T)',
+        }
     
-    A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz')).astype('uint32')
-    B = sparse.load_npz(os.path.join(source_folder, 'B_mat.npz')).astype('i1').tocsr()
-    P = sparse.load_npz(os.path.join(source_folder, 'P_mat.npz')).astype('i1').tocsr()
+    A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz')).astype('float32')
+    B = sparse.load_npz(os.path.join(source_folder, 'B_mat.npz')).astype('float32').tocsr()
+    P = sparse.load_npz(os.path.join(source_folder, 'P_mat.npz')).astype('float32').tocsr()
     
     metrics = pd.DataFrame(columns = ['kernel', 'acc', 'recall', 'f1'])
     
     for metapath, formula in metapath_map.items():
-        print(f'Fitting {metapath} model...')
+        print(f'\tFitting {metapath} model...')
         commuting_matrix = []
-        for i in range(a.shape[0]):
+        for i in tqdm(range(A.shape[0])):
             A_ = A[i]
             commuting_matrix.append(eval(formula))
         commuting_matrix = sparse.vstack(commuting_matrix, format='csr')
         
         sparse.save_npz(os.path.join(source_folder, f'{metapath}.npz'), commuting_matrix)
         
-        mdl = SVC(**svm_args)
+        mdl = SVC(kernel='precomputed')
         mdl.fit(commuting_matrix.todense(), apps.label)
         
         # collect metrics
@@ -140,18 +148,6 @@ def make_models(source_folder, svm_args={}):
     print(metrics.set_index('kernel'))
 
     
-def predict():
-    metapath_map = {
-        'AAT': 'A_test * A.T',
-        'ABAT': 'A_test * B * A.T',
-        'APAT': 'A_test * P * A.T',
-        'ABPBTAT': 'A_test * B * P * B.T *  A.T',
-        'APBPTAT': 'A_test * P * B * P.T *  A.T',
-    }
-    
-    
-    
-    
 def load_apps(source_folder):
     apps = (
         pd.read_csv(
@@ -166,6 +162,15 @@ def load_apps(source_folder):
             )
         )
     )
+    category = pd.read_csv(
+        os.path.join('data', 'out', 'all-apps', 'app_list.csv'),
+        index_col='app', 
+        usecols=['app', 'category'], 
+        squeeze=True)
+    apps['category'] = category
+    # ONLY FOR TESTING fill missing vals
+    apps['category'] = apps['category'].fillna({'testapp1': 'test', 'testapp2': 'malware'})
+    
     apps = apps.reset_index().set_index(apps.uid.str.replace('app', '').astype(int)).sort_index()
     apps['label'] = (apps.category=='malware').astype(int)
     return apps
