@@ -172,6 +172,28 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
     if update_figs:
         pio.write_html(fig, file=os.path.join('docs', '_includes', '3D-plot.html'), auto_open=True)
     
+def compute_model_performance_statistics(pred, true):
+    '''
+    Returns a series with the f1-score, accuracy, recall, and confusion counts (TP, TN, FP, FN).
+    '''
+    TN, FP, FN, TP = confusion_matrix(true, pred).ravel()
+    return pd.Series({
+        'f1': f1_score(true, pred),
+        'acc': accuracy_score(true, pred),
+        'rec': recall_score(true, pred),
+        'TP': TP,
+        'TN': TN,
+        'FP': FP,
+        'FN': FN
+    })
+    
+    
+def create_performance_table(m2v_results_path, hindroid_results_path, outpath):
+    results = pd.read_csv(m2v_results_path, index_col='app').join(pd.read_csv(hindroid_results_path, index_col='app'))
+    y_true = results.true
+    table = results.drop(columns=['true']).apply(partial(compute_model_performance_statistics, true=y_true)).T
+    table.astype({col: int for col in ['TP', 'TN', 'FP', 'FN']}).to_csv(outpath)    
+
     
 def generate_analysis(data_path, jobs={}):
     "Generates plots, aggregates, and statistical analysis on app data located in `data_path`"

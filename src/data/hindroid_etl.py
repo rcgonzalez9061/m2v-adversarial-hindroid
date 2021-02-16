@@ -18,6 +18,12 @@ from functools import partial
 import csv
 from sparse_dot_mkl import dot_product_mkl
 
+def build_from_folder(outfolder, redo=False):
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'P_mat.npz')) or redo:
+        build_matrices(outfolder)
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'APBPTAT.mdl')) or redo:
+        make_models(outfolder)
+    return
 
 def dask_prep(edges_path, client):
     print(f"Dask Cluster: {client.cluster}")
@@ -42,14 +48,7 @@ def dask_prep(edges_path, client):
     api_package_edges = api_package_edges.groupby('source').target.unique().compute()
     api_package_edges[api_package_edges.apply(len)>1].to_pickle('data/temp/package_api_sets.pkl')
 
-def build_from_folder(outfolder, redo=False):
-    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'P_mat.npz')) or redo:
-        build_martices(outfolder)
-    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'APBPTAT.mdl')) or redo:
-        make_models(outfolder)
-    return
-
-def build_martices(outfolder):
+def build_matrices(outfolder):
     os.makedirs(os.path.join(outfolder, 'hindroid'), exist_ok=True)
 
     edges_path = os.path.join(outfolder, 'edges.csv')
@@ -106,12 +105,12 @@ def make_models(source_folder):
     
     source_folder = os.path.join(source_folder, 'hindroid')
     metapath_map = {
-            'AAT': 'dot_product_mkl(A_, A.T)',
-            'ABAT': 'dot_product_mkl(dot_product_mkl(A_, B), A.T)',
-            'APAT': 'dot_product_mkl(dot_product_mkl(A_, P), A.T)',
-            'ABPBTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, B), P), B.T), A.T)',
-            'APBPTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, P), B), P.T), A.T)',
-        }
+        'AAT': 'dot_product_mkl(A_, A.T)',
+        'ABAT': 'dot_product_mkl(dot_product_mkl(A_, B), A.T)',
+        'APAT': 'dot_product_mkl(dot_product_mkl(A_, P), A.T)',
+        'ABPBTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, B), P), B.T), A.T)',
+        'APBPTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, P), B), P.T), A.T)',
+    }
     
     A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz')).astype('float32')
     B = sparse.load_npz(os.path.join(source_folder, 'B_mat.npz')).astype('float32').tocsr()
@@ -122,8 +121,9 @@ def make_models(source_folder):
     for metapath, formula in metapath_map.items():
         print(f'\tFitting {metapath} model...')
         commuting_matrix = []
-        for i in tqdm(range(A.shape[0])):
-            A_ = A[i]
+        batch_size = 100
+        for i in tqdm(range(0, A.shape[0], batch_size)):
+            A_ = A[i:i+batch_size]
             commuting_matrix.append(eval(formula))
         commuting_matrix = sparse.vstack(commuting_matrix, format='csr')
         
