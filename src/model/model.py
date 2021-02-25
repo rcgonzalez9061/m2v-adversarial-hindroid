@@ -17,7 +17,7 @@ from gensim.models import Word2Vec
 
 class M2VDroid():
     def __init__(self, source_folder, classifier=RandomForestClassifier, classifier_args={}, name=None):
-        self.name = name if name is not None else os.path.basename(source_folder)
+        self.name = name if name is not None else os.path.basename(source_folder.rstrip(os.path.sep))
         self._folder = source_folder
         self.edges_path = os.path.join(source_folder, 'edges.csv')
         self.classifier = classifier

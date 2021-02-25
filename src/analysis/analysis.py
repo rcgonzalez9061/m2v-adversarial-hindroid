@@ -12,6 +12,8 @@ from sklearn.cluster import KMeans
 import plotly
 import plotly.graph_objs as go
 import plotly.io as pio
+from functools import partial
+from sklearn.metrics import confusion_matrix, f1_score, accuracy_score, recall_score
 
 
 def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
@@ -178,9 +180,9 @@ def compute_model_performance_statistics(pred, true):
     '''
     TN, FP, FN, TP = confusion_matrix(true, pred).ravel()
     return pd.Series({
-        'f1': f1_score(true, pred),
-        'acc': accuracy_score(true, pred),
-        'rec': recall_score(true, pred),
+        'ACC': accuracy_score(true, pred),
+        'TPR': recall_score(true, pred),
+        'F1': f1_score(true, pred),
         'TP': TP,
         'TN': TN,
         'FP': FP,
@@ -188,11 +190,17 @@ def compute_model_performance_statistics(pred, true):
     })
     
     
-def create_performance_table(m2v_results_path, hindroid_results_path, outpath):
-    results = pd.read_csv(m2v_results_path, index_col='app').join(pd.read_csv(hindroid_results_path, index_col='app'))
+def create_performance_table(m2v_results_path, hindroid_results_path, outpath=None):
+    results = pd.read_csv(m2v_results_path, index_col='app')
+    if 'true' in results.columns:
+        results = results.drop(columns=['true'])
+    results = results.join(pd.read_csv(hindroid_results_path, index_col='app'))
     y_true = results.true
     table = results.drop(columns=['true']).apply(partial(compute_model_performance_statistics, true=y_true)).T
-    table.astype({col: int for col in ['TP', 'TN', 'FP', 'FN']}).to_csv(outpath)    
+    table = table.astype({col: int for col in ['TP', 'TN', 'FP', 'FN']})
+    if outpath is not None:
+        table.to_csv(outpath)
+    return table
 
     
 def generate_analysis(data_path, jobs={}):

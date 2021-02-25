@@ -10,18 +10,22 @@ import pandas as pd
 import numpy as np
 import pickle
 import json
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from p_tqdm import p_map, p_imap
 from scipy import sparse
 from itertools import combinations, product
 from functools import partial
 import csv
 from sparse_dot_mkl import dot_product_mkl
+import cupy as cp
+from cupyx.scipy.sparse import csr_matrix as csr_gpu
+from cupyx.scipy.sparse import vstack as gpu_vstack
+import time
 
 class Hindroid():
     def __init__(self, source_folder, name=None):
         # load matrices
-        self.name = name if name is not None else os.path.split(source_folder)[1]
+        self.name = name if name is not None else os.path.basename(source_folder.rstrip(os.path.sep))
         self.A = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'A_mat.npz')).astype('float32')
         self.B = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'B_mat.npz')).astype('float32').tocsr()
         self.P = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'P_mat.npz')).astype('float32').tocsr()
@@ -48,6 +52,8 @@ class Hindroid():
         
         Outputs predictions to a csv in 
         '''
+        outpath = os.path.join(path, f'hindroid-{self.name}')
+        os.makedirs(outpath, exist_ok=True)
         # get app data, compute unique apis
         apps = pd.read_csv(os.path.join(path, 'app_list.csv'), usecols=['app'], squeeze=True, dtype=str)
         app_data_list = (
@@ -67,13 +73,20 @@ class Hindroid():
             app_features[list(api_list)] = 1
             return app_features
         
-        print("Building A test matrix")
-        features = []
-        for api_list in tqdm(apis_by_app):
-            features.append(make_feature(api_list))
+        features = sparse.lil_matrix((len(apps), len(self.api_map)), dtype='float32')
+        row_idx = 0
+        pbar = tqdm(apis_by_app)
+        pbar.set_description('Building A-test matrix')
+        for api_list in pbar:
+            features[row_idx, api_list] = 1
+            row_idx += 1
+        features = features.tocsr()
+        sparse.save_npz(os.path.join(outpath, 'A_test.npz'), features)
         
         print("Making predictions")
+        time.sleep(1)
         results = self.batch_predict(features)
+        results.index = apis_by_app.index
         
         true_labels = pd.read_csv('data/out/all-apps/app_list.csv', usecols=['app', 'malware'], index_col='app', squeeze=True)
         true_labels = true_labels[apps]
@@ -82,7 +95,7 @@ class Hindroid():
             print(f'{col}:')
             print(classification_report(true_labels, pred))
         results['true'] = true_labels
-        results.to_csv(os.path.join(path, f'{self.name}_HD_predictions.csv'))
+        results.to_csv(os.path.join(outpath, f'predictions.csv'))
         
         
         return results
@@ -125,17 +138,18 @@ class Hindroid():
         kernel: str, A member of {'AAT', 'ABAT', 'APAT', 'ABPBTAT', 'APBPTAT'}
         '''
         formula_map = {
-            'AAT': 'dot_product_mkl(x, self.A.T)',
-            'ABAT': 'dot_product_mkl(dot_product_mkl(x, self.B), self.A.T)',
-            'APAT': 'dot_product_mkl(dot_product_mkl(x, self.P), self.A.T)',
-            'ABPBTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(x, self.B), self.P), self.B.T), self.A.T)',
-            'APBPTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(x, self.P), self.B), self.P.T), self.A.T)',
+            'AAT': 'x * self.A.T',
+            'ABAT': 'x * self.B * self.A.T',
+            'APAT': 'x * self.P * self.A.T',
+            'ABPBTAT': 'x * self.B * self.P * self.B * self.A.T',
+            'APBPTAT': 'x * self.P * self.B * self.P * self.A.T',
         }
         
+        x = x.reshape(-1, x.size)
         features = eval(formula_map[kernel])
-        prediction = eval(f'self.{metapath}.predict(features)')
+        prediction = eval(f'self.{kernel}.predict(features)')
         
-        return predictions
+        return prediction[0]
     
     def batch_predict(self, X):
         '''
@@ -148,32 +162,41 @@ class Hindroid():
         Returns: DataFrame with predictions using Apps as rows and kernels as columns with the true labels appended.  
         '''
         formula_map = {
-            'AAT': 'self.A.T',
-            'ABAT': 'dot_product_mkl(self.B, self.A.T)',
-            'APAT': 'dot_product_mkl(self.P, self.A.T)',
-            'ABPBTAT': 'dot_product_mkl(self.B, dot_product_mkl(self.P, dot_product_mkl(self.B.T, self.A.T)))',
-            'APBPTAT': 'dot_product_mkl(self.P, dot_product_mkl(self.B, dot_product_mkl(self.P.T, self.A.T)))',
+            'AAT': 'X_ * self.A.T',
+            'ABAT': 'X_ * self.B * self.A.T',
+            'APAT': 'X_ * self.P * self.A.T',
+            'ABPBTAT': 'X_ * self.B * self.P * self.B * self.A.T',
+            'APBPTAT': 'X_ * self.P * self.B * self.P * self.A.T',
         }
         
         results = pd.DataFrame(
             columns=['AAT', 'ABAT', 'APAT', 'ABPBTAT', 'APBPTAT'],
         )
-        
+                
         # predict by model
         for col in results.columns:
-            print(f'Predicting {col}')
-            fit_matrix = eval(formula_map[col])
-            batch_size = 300 # split features into batches of this size (avoids OOM errors)
-            fit_features = sparse.vstack([
-                dot_product_mkl(sparse.csr_matrix(X[i:i+batch_size], dtype='float32'), fit_matrix)
-                for i in range(0, len(X), batch_size)
-            ]).todense()
+            print(f'')
+            batch_size = 500
+            fit_features = []
+            pbar = tqdm(range(0, X.shape[0], batch_size))
+            pbar.set_description(f"Predicting {col}, batch")
+            for i in pbar:
+                X_ = X[i:i+batch_size]
+                fit_features.append(eval(formula_map[col]))
+            fit_features = sparse.vstack(fit_features).todense()
             preds = eval(f'self.{col}.predict(fit_features)')
             results[col] = preds
         
         return results
         
-        
+def gpu_dot(A, B):
+    '''
+    Performs dot product of A and B on gpu row-by-row to avoid OOM errors.
+    '''
+    result = []
+    for i in tqdm(range(A.shape[0])):
+        result.append(A[i].dot(B))
+    return gpu_vstack(result)
         
         
         

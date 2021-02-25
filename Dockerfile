@@ -62,8 +62,8 @@ RUN P=/tmp/$(basename $APK_JAR) && \
 #     libnvinfer-plugin7=7.1.3-1+cuda11.0
 
 # Additional py packages
-RUN pip install stellargraph p_tqdm jekyllnb adversarial-robustness-toolbox sparse-dot-mkl
-    
+RUN pip install stellargraph p_tqdm jekyllnb adversarial-robustness-toolbox sparse-dot-mkl cupy-cuda111 
+     
 RUN export LD_LIBRARY_PATH=/opt/intel/mkl/lib/intel64:$LD_LIBRARY_PATH
 
     
