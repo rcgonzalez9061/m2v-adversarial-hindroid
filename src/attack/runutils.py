@@ -75,7 +75,7 @@ def make_cuda_consistent(refobj, *args):
     for v in args:
         cuda_state = get_cuda_state(v)
         if cuda_state != ref_cuda_state:
-            if isinstance(v, Variable):
+            if isinstance(v, Variable) and not isinstance(v, torch.Tensor):
                 raise ValueError('cannot change cuda state of a Variable')
             elif isinstance(v, nn.Module):
                 move_to_device(v)

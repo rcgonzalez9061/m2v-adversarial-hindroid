@@ -1,10 +1,7 @@
-import sys
-import os
-
+import sys, os, re
 
 import pandas as pd
 import numpy as np
-import re
 from pathlib import Path
 from src.utils import find_apps
 from p_tqdm import p_umap
@@ -121,7 +118,12 @@ def get_data(outfolder, data_source=None, nprocs=2, recompute=False):
         if os.path.exists(outpath) and not recompute:
             return
         else:
-            app.parse().to_csv(outpath, index=False)
+            data = app.parse()
+            if data.shape[0] == 0:
+                print(f'No data for {app.app_name}', file=sys.stdout)
+                return
+            else:
+                data.to_csv(outpath, index=False)
 
     print("STEP 1 - PARSING APPS")
     # concurrent execution of smali parsing

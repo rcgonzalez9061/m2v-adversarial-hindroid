@@ -1,7 +1,8 @@
 {
-    "outfolder": "data/out/train-half",
+    "outfolder": "data/out/train-set",
     "parse_params": {
-        "nprocs": 16
+        "nprocs": 16,
+        "recompute": false
     },
     "feature_params": {
         "redo": false,
@@ -24,7 +25,7 @@
             "negative": 5,
             "sg": 1,
             "workers": 16,
-            "iter": 5
+            "iter": 10
         }
     },
     "hindroid_params": {

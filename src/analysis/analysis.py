@@ -69,10 +69,14 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
     plt.title("2D {} visualization of node embeddings".format(transform.__name__))
     legend1 = plt.legend(scatter.legend_elements()[0], pd.Series(label_map.keys()).str.replace('-', ' ').str.title(),
                         loc='center left', bbox_to_anchor=(1, 0.5), title="App Type", markerscale=1.5)
+    
     # order labels (https://stackoverflow.com/a/46160465/13710014)
-    handles, labels = plt.gca().get_legend_handles_labels()
-    order = ['Popular Apps', 'Random Apss'] + list(top_9_malware.index)
-    plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+#     handles, g_labels = plt.gca().get_legend_handles_labels()
+#     print(handles, labels)
+#     if not no_labels:
+#         order = ['Popular Apps', 'Random Apps']
+#         order +=  list(top_9_malware.index)
+#         plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
     
     plt.savefig(os.path.join(data_folder, '2D-plot.png'), bbox_inches='tight')
     
@@ -191,7 +195,7 @@ def compute_model_performance_statistics(pred, true):
     
     
 def create_performance_table(m2v_results_path, hindroid_results_path, outpath=None):
-    results = pd.read_csv(m2v_results_path, index_col='app')
+    results = pd.read_csv(m2v_results_path, index_col='app', usecols=['app', 'm2vDroid', 'true'])
     if 'true' in results.columns:
         results = results.drop(columns=['true'])
     results = results.join(pd.read_csv(hindroid_results_path, index_col='app'))

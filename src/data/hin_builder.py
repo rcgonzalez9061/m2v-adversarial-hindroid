@@ -1,3 +1,10 @@
+import os, json
+import pandas as pd
+import numpy as np
+import pickle
+from p_tqdm import p_umap
+from shutil import copyfile
+
 from dask.distributed import Client, LocalCluster, performance_report
 import dask.dataframe as dd
 
@@ -5,14 +12,6 @@ from stellargraph import StellarGraph, IndexedArray
 from stellargraph.data import UniformRandomMetaPathWalk
 
 from gensim.models import Word2Vec
-
-import os
-import pandas as pd
-import numpy as np
-import pickle
-import json
-from p_tqdm import p_umap
-from shutil import copyfile
 
 
 def get_features(outfolder, walk_args=None, w2v_args=None, redo=False):
@@ -26,7 +25,17 @@ def get_features(outfolder, walk_args=None, w2v_args=None, redo=False):
     outfolder:      Path to directory where output will be saved, should contain app_list.csv
     walk_args:      Arguments for stellargraph.data.UniformRandomMetaPathWalk
     w2v_args:       Arguments for gensim.models.Word2Vec
-    '''   
+    '''
+    # save parameters to outfolder
+    params = {
+        "outfolder": outfolder,
+        "walk_args": walk_args,
+        "w2v_args": w2v_args 
+    }
+    with open(os.path.join(outfolder, 'params.json'), 'w') as param_file:
+        json.dump(params, param_file)
+    
+    # define paths
     app_list_path = os.path.join(outfolder, 'app_list.csv')
     nodes_path = os.path.join(outfolder, 'nodes.json')
     edge_path = os.path.join(outfolder, 'edges.csv')
@@ -78,23 +87,23 @@ def get_features(outfolder, walk_args=None, w2v_args=None, redo=False):
     features.to_csv(feature_path)
 
 def build_graph(outfolder, app_data_list, nodes_path, edge_path):
-    with Client() as client, performance_report(os.path.join(outfolder, "performance_report.html")):
-        print(f"Dask Cluster: {client.cluster}")
-        print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
+#     with Client() as client, performance_report(os.path.join(outfolder, "performance_report.html")):
+#     print(f"Dask Cluster: {client.cluster}")
+#     print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
 
-        data = dd.read_csv(list(app_data_list), dtype=str)
-        client.persist(data)
+    data = dd.read_csv(list(app_data_list), dtype=str).compute()
 
-        nodes = {}
-        api_map = None
+    nodes = {}
+    api_map = None
 
-        # setup edges.csv
-        pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
+    # setup edges.csv
+    pd.DataFrame(columns=['source', 'target']).to_csv(edge_path, index=False)
 
-        for label in ['api', 'app', 'method', 'package']:
-            print(f'Indexing {label}s')
-            uid_map = data[label].unique().compute()
-            uid_map = uid_map.to_frame()
+    for label in ['api', 'app', 'method', 'package']:
+        print(f'Indexing {label}s')
+#         uid_map = data[label].unique()
+        uid_map = pd.DataFrame()
+        uid_map[label] = data[label].unique()
 
 #             if base_data is not None: # load base items
 #                 base_items = pd.read_csv(
@@ -103,23 +112,25 @@ def build_graph(outfolder, app_data_list, nodes_path, edge_path):
 #                 )
 #                 uid_map = pd.concat([base_items, uid_map], ignore_index=True).drop_duplicates().reset_index(drop=True)
 
-            uid_map['uid'] = label + pd.Series(uid_map.index).astype(str)
-            uid_map = uid_map.set_index(label)
-            uid_map.to_csv(os.path.join(outfolder, label+'_map.csv'))
-            nodes[label] = IndexedArray(index=uid_map.uid.values)
+        uid_map['uid'] = label + pd.Series(uid_map.index).astype(str)
+        uid_map = uid_map.set_index(label)
+        uid_map.to_csv(os.path.join(outfolder, label+'_map.csv'))
+        nodes[label] = IndexedArray(index=uid_map.uid.values)
 
-            # get edges if not api
-            if label == 'api':
-                api_map = uid_map.uid  # create api map
-            else:
-                print(f'Finding {label}-api edges')
-                edges = data[[label, 'api']].drop_duplicates().compute()
-                edges[label] = edges[label].map(uid_map.uid)
-                edges['api'] = edges['api'].map(api_map)
-                edges.to_csv(edge_path, mode='a', index=False, header=False)
+        # get edges if not api
+        if label == 'api':
+            api_map = uid_map.uid  # create api map
+        else:
+            print(f'Finding {label}-api edges')
+            edges = data[[label, 'api']].drop_duplicates()
+            edges[label] = edges[label].map(uid_map.uid)
+            edges['api'] = edges['api'].map(api_map)
+            edges.to_csv(edge_path, mode='a', index=False, header=False)
 
-        # save nodes to file
-        with open(nodes_path, 'wb') as file:
-            pickle.dump(nodes, file)
+    del data
+    
+    # save nodes to file
+    with open(nodes_path, 'wb') as file:
+        pickle.dump(nodes, file)
 
-        return StellarGraph(nodes = nodes, edges = pd.read_csv(edge_path))
+    return StellarGraph(nodes = nodes, edges = pd.read_csv(edge_path))

@@ -11,7 +11,7 @@ def main():
                         help='Folder to unload apps, will place each app into their own folders.')
     args = parser.parse_args()
     app_name = os.path.split(args.apk_path.replace('.apk', ''))[1]
-    os.system(f"apktool d -r -f {args.apk_path} -o {os.path.join(args.outfolder, app_name)}")
+    os.system(f"apktool d -r -f --no-assets {args.apk_path} -o {os.path.join(args.outfolder, app_name)}")
 #     os.system()
 
 if __name__ == '__main__':

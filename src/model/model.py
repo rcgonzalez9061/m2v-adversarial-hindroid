@@ -28,14 +28,17 @@ class M2VDroid():
         self.api_map = pd.read_csv(os.path.join(source_folder, 'api_map.csv'), index_col='api', squeeze=True)
         with open(os.path.join(source_folder, 'metapath_walk.json')) as file:
             self.metapath_walks = json.load(file)
+        with open(os.path.join(source_folder, 'params.json')) as file:
+            self.params = json.load(file)
         with open(os.path.join(source_folder, 'nodes.json'), 'rb') as file:
             self.nodes = pickle.load(file)
     
-    def fit_predict(self, path, walk_args, w2v_args):
+    def fit_predict(self, path):
         outpath = os.path.join(path, f'm2v-{self.name}')
         os.makedirs(outpath, exist_ok=True)
         # get app data, compute unique apis
         apps = pd.read_csv(os.path.join(path, 'app_list.csv'), usecols=['app'], squeeze=True, dtype=str)
+#         apps = set(apps)
         app_data_list = os.path.join('data', 'out', 'all-apps', 'app-data/') + apps + '.csv'
         
         print('Computing new edges')
@@ -52,6 +55,7 @@ class M2VDroid():
         
         print('Running random walk')
         rw = UniformRandomMetaPathWalk(g)
+        walk_args = self.params['walk_args']
         new_walks = rw.run(list(apps), n=walk_args['n'], length=walk_args['length'], metapaths=walk_args['metapaths'])
         metapath_walks = (
             self.metapath_walks 
@@ -60,17 +64,17 @@ class M2VDroid():
         
         print('Running Word2Vec')
         # make features with word2vec
-        w2v = Word2Vec(metapath_walks, **w2v_args)
+        w2v = Word2Vec(metapath_walks, **self.params['w2v_args'])            
         
         print('Fitting model')
         features = pd.DataFrame(w2v.wv.vectors)
-        features['uid'] = w2v.wv.index2word
-#         map_func = lambda uid: uid if uid not in self.app_map else self.app_map[uid]
-#         features['app'] = features['uid'].map(map_func)
-        X_train = features[features.uid.str.match('app\d+')]
-        X_train.uid = X_train.uid.map(self.inverse_app_map)
-        X_train = X_train.set_index('uid', drop=True)
-        X_test = features.set_index('uid').loc[apps]
+        features['app'] = w2v.wv.index2word
+        map_func = lambda uid: uid if uid not in self.inverse_app_map else self.inverse_app_map[uid]
+        features['app'] = features['app'].map(map_func)
+        features = features.set_index('app')
+        X_train = features.loc[self.app_map.keys()]
+#         X_train = X_train.uid.map(self.inverse_app_map)
+        X_test = features.loc[apps]
         
         # train model and predict new apps
         labels = pd.read_csv('data/out/all-apps/app_list.csv', usecols=['app', 'malware'], index_col='app', squeeze=True)
@@ -79,16 +83,22 @@ class M2VDroid():
         
         mdl = self.classifier(**self.classifier_args)
         mdl.fit(X_train, y_train)
-        
         pred = mdl.predict(X_test)
         
         print(classification_report(y_test, pred))
         
-        results = pd.DataFrame(index=apps).assign(
+        results = X_test.assign(
             m2vDroid=pred,
             true=y_test
         )
+        
+        # save results and training data
         results.to_csv(os.path.join(outpath, 'predictions.csv'))
+        X_train.assign(
+            m2vDroid=mdl.predict(X_train),
+            true=y_train
+        ).to_csv(os.path.join(outpath, 'training_data.csv'))
+        
         return results
             
             

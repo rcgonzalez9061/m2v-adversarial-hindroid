@@ -1,4 +1,5 @@
 """
+Source: https://github.com/kkew3/pytorch-cw2
 Carlini-Wagner attack (http://arxiv.org/abs/1608.04644).
 
 Referential implementation:
@@ -16,7 +17,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
-import src.attack.runutils
+from  src.attack import runutils
+from src.attack.attack import HindroidSubstitute
 
 
 def _var2numpy(var):
@@ -243,7 +245,8 @@ class L2Adversary(object):
         :return: the adversarial examples on CPU, of dimension [B x n_features]
         """
         # sanity check
-        assert isinstance(model, nn.Module)
+        assert isinstance(model, nn.Module) or isinstance(model, HindroidSubstitute)
+        print(inputs.size())
         assert len(inputs.size()) == 2
         assert len(targets.size()) == 1
 
@@ -280,7 +283,7 @@ class L2Adversary(object):
         o_best_advx = inputs.clone().cpu().numpy()  # type: np.ndarray
 
         # convert `inputs` to tanh-space
-        inputs_tanh = self._to_tanh_space(inputs)  # type: torch.FloatTensor
+        inputs_tanh = torch.clamp(self._to_tanh_space(inputs), min=-10)  # type: torch.FloatTensor
         inputs_tanh_var = Variable(inputs_tanh, requires_grad=False)
 
         # the one-hot encoding of `targets`
@@ -294,7 +297,11 @@ class L2Adversary(object):
         # In Carlini's code it's denoted as `modifier`
         pert_tanh = torch.zeros(inputs.size())  # type: torch.FloatTensor
         if self.init_rand:
-            nn.init.normal_(pert_tanh, mean=0, std=1e-3)
+            pert_tanh = torch.ones(inputs.size()) * 1e-4
+            pert_tanh *= torch.rand(inputs.size()) < 5e-2
+#             nn.init.normal_(pert_tanh, mean=0, std=1e4) # larger variation to kick-start perts 
+#             pert_tanh = torch.abs(pert_tanh) - (2 * 1e4)
+#             pert_tanh = torch.clamp(pert_tanh, min=1)
         pert_tanh = runutils.make_cuda_consistent(model, pert_tanh)[0]
         pert_tanh_var = Variable(pert_tanh, requires_grad=True)
 
@@ -333,11 +340,14 @@ class L2Adversary(object):
                                                     targets_np),
                         axis=1)
                 for i in range(batch_size):
+                    ax = advxs_np[i]
                     l2 = pert_norms_np[i]
-                    cppred = comp_pert_predictions_np[i]
+                    ax_tensor = torch.Tensor(ax).view(-1, inputs.size(1)).double()
+                    ax_tensor = runutils.make_cuda_consistent(model, ax_tensor)[0]
+                    cppred = torch.argmax(torch.softmax(model(torch.round(ax_tensor)), dim=1), dim=1).item()
                     ppred = pert_predictions_np[i]
                     tlabel = targets_np[i]
-                    ax = advxs_np[i]
+                    
                     if self._attack_successful(cppred, tlabel):
                         assert cppred == ppred
                         if l2 < best_l2[i]:
@@ -405,7 +415,7 @@ class L2Adversary(object):
         """
         # the adversarial examples in the API space
         # of dimension [B x n_features]
-        advxs_var = self._from_tanh_space(inputs_tanh_var + pert_tanh_var)  # type: Variable
+        advxs_var = self._from_tanh_space(inputs_tanh_var + pert_tanh_var*1e4)  # type: Variable
         # the perturbed activation before softmax (logits)
         pert_outputs_var = model(advxs_var)  # type: Variable
         # the original inputs
@@ -459,7 +469,7 @@ class L2Adversary(object):
             f_var = torch.clamp(target_activ_var - maxother_activ_var
                                 + self.confidence, min=0.0)
         # the total loss of current batch, should be of dimension [1]
-        batch_loss_var = torch.sum(perts_norm_var + c_var * f_var)  # type: Variable
+        batch_loss_var = torch.sum(perts_norm_var*1e2 + c_var * f_var)  # type: Variable
 
         # Do optimization for one step
         optimizer.zero_grad()
@@ -467,7 +477,7 @@ class L2Adversary(object):
         optimizer.step()
 
         # Make some records in python/numpy on CPU
-        batch_loss = batch_loss_var.data[0]  # type: float
+        batch_loss = batch_loss_var.item()  # type: float
         pert_norms_np = _var2numpy(perts_norm_var)
         pert_outputs_np = _var2numpy(pert_outputs_var)
         advxs_np = _var2numpy(advxs_var)

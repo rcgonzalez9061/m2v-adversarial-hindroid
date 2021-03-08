@@ -25,10 +25,13 @@ import time
 class Hindroid():
     def __init__(self, source_folder, name=None):
         # load matrices
+        self.source_folder = source_folder
         self.name = name if name is not None else os.path.basename(source_folder.rstrip(os.path.sep))
-        self.A = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'A_mat.npz')).astype('float32')
-        self.B = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'B_mat.npz')).astype('float32').tocsr()
-        self.P = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'P_mat.npz')).astype('float32').tocsr()
+        self.A = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'A_mat.npz')).astype('int32')
+        self.B = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'B_mat.npz')).astype('i1').tocsr()
+        self.P = sparse.load_npz(os.path.join(source_folder, 'hindroid', 'P_mat.npz')).astype('i1').tocsr()
+        
+#         self.make_prefit_matrices()
         
         # load models
         with open(os.path.join(source_folder, 'hindroid', 'AAT.mdl'), 'rb') as file:
@@ -45,6 +48,37 @@ class Hindroid():
         self.app_map = pd.read_csv(os.path.join(source_folder, 'app_map.csv'), index_col='app', squeeze=True)
         self.api_map = pd.read_csv(os.path.join(source_folder, 'api_map.csv'), index_col='api', squeeze=True)
         self.api_map = self.api_map.str.replace('api', '').astype(int)
+    
+    def make_prefit_matrices(self):
+        formula_map = {
+            'AAT': [self.A.T],
+            'ABAT': [self.B, self.A.T],
+            'APAT': [self.P, self.A.T],
+            'ABPBTAT': [self.B, self.P, self.B, self.A.T],
+            'APBPTAT': [self.P, self.B, self.P, self.A.T],
+        }
+        
+        for mp, mat_list in formula_map.items():
+            
+            outpath = os.path.join(self.source_folder, 'hindroid', f'{mp}_prefit.npz')
+            if os.path.exists(outpath):  # skip if already present
+                print(f'{mp}_prefit.npz already exists.')
+                continue
+            mat = [None]*mat_list[-1].shape[0]
+            pbar = trange(mat_list[-1].shape[1])
+            pbar.set_description(f'Computing {mp} prefix')
+            for i in pbar:
+                formula_idx = -1
+                mat[i] = mat_list[formula_idx][:,i]
+                while formula_idx > -len(mat_list):
+                    formula_idx -= 1
+                    mat_list[formula_idx]
+                    mat[i] = mat_list[formula_idx].dot(mat[i])
+            
+            sparse.save_npz(outpath, sparse.hstack(mat))
+    
+    def load_prefit_matrix(self, metapath):
+        return sparse.load_npz(os.path.join(self.source_folder, f'{metapath}_prefit.npz'))
     
     def fit_predict(self, path):
         '''
@@ -151,7 +185,7 @@ class Hindroid():
         
         return prediction[0]
     
-    def batch_predict(self, X):
+    def batch_predict(self, X, outfolder=None):
         '''
         Predict a batch of feature vectors of apps with all available kernels.
         
@@ -175,16 +209,22 @@ class Hindroid():
                 
         # predict by model
         for col in results.columns:
+            if outfolder is not None and os.path.exists(os.path.join(outfolder, f'{col}.npz')):
+                print(f'{col} already present.')
+                continue
             print(f'')
-            batch_size = 500
+            batch_size = 100
             fit_features = []
             pbar = tqdm(range(0, X.shape[0], batch_size))
             pbar.set_description(f"Predicting {col}, batch")
             for i in pbar:
                 X_ = X[i:i+batch_size]
                 fit_features.append(eval(formula_map[col]))
-            fit_features = sparse.vstack(fit_features).todense()
-            preds = eval(f'self.{col}.predict(fit_features)')
+            fit_features = sparse.vstack(fit_features)
+            if outfolder is not None:
+                sparse.save_npz(os.path.join(outfolder, f'{col}.npz'), fit_features)
+            
+            preds = eval(f'self.{col}.predict(fit_features.todense())')
             results[col] = preds
         
         return results

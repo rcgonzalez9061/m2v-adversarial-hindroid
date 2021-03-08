@@ -20,35 +20,39 @@ from sparse_dot_mkl import dot_product_mkl
 
 def build_from_folder(outfolder, redo=False):
     if not os.path.exists(os.path.join(outfolder, 'hindroid', 'P_mat.npz')) or redo:
-        build_matrices(outfolder)
+        build_matrices(outfolder, redo=redo)
     if not os.path.exists(os.path.join(outfolder, 'hindroid', 'APBPTAT.mdl')) or redo:
-        make_models(outfolder)
+        make_models(outfolder, redo=redo)
     return
 
-def dask_prep(edges_path, client):
-    print(f"Dask Cluster: {client.cluster}")
-    print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
+def edge_prep(edges_path):
+#     print(f"Dask Cluster: {client.cluster}")
+#     print(f"Dashboard port: {client.scheduler_info()['services']['dashboard']}")
 
-    edges = dd.read_csv(edges_path, dtype=str)
+    edges = dd.read_csv(edges_path, dtype=str).compute()
     edges['target'] = edges.target.str.replace('api', '').astype(int)
 
 
     # A matrix prep
     app_api_edges = edges[edges.source.str.startswith('app')]
     app_api_edges['source'] = app_api_edges.source.str.replace('app', '').astype(int)
-    app_api_edges.groupby('source').target.unique().compute().sort_index().to_pickle('data/temp/app_api_sets.pkl')
+    app_api_edges.groupby('source').target.unique().sort_index().to_pickle('data/temp/app_api_sets.pkl')
+    del app_api_edges
 
     # B matrix prep
     api_method_edges = edges[edges.source.str.startswith('method')]
-    api_method_edges = api_method_edges.groupby('source').target.unique().compute()
+    api_method_edges = api_method_edges.groupby('source').target.unique()
     api_method_edges[api_method_edges.apply(len)>1].to_pickle('data/temp/method_api_sets.pkl')
+    del api_method_edges
 
     # P matrix prep
     api_package_edges = edges[edges.source.str.startswith('package')]
-    api_package_edges = api_package_edges.groupby('source').target.unique().compute()
+    api_package_edges = api_package_edges.groupby('source').target.unique()
     api_package_edges[api_package_edges.apply(len)>1].to_pickle('data/temp/package_api_sets.pkl')
+    del api_package_edges
+    del edges
 
-def build_matrices(outfolder):
+def build_matrices(outfolder, redo):
     os.makedirs(os.path.join(outfolder, 'hindroid'), exist_ok=True)
 
     edges_path = os.path.join(outfolder, 'edges.csv')
@@ -64,27 +68,36 @@ def build_matrices(outfolder):
     mlb = MultiLabelBinarizer(sparse_output=True)
     mlb.fit([(api,) for api in apis])
         
-    with Client() as client:
-        dask_prep(edges_path, client)
+#     with Client() as client:
+    edge_prep(edges_path)
 
     # A matrix
     print("Constructing A matrix...")
 
-    A_mat = mlb.transform(pd.read_pickle('data/temp/app_api_sets.pkl'))
-    f'Constructed: {repr(A_mat)}'
-    sparse.save_npz(os.path.join(outfolder, 'hindroid', 'A_mat.npz'), A_mat)
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'A_mat.npz')) or redo:
+        A_mat = mlb.transform(pd.read_pickle('data/temp/app_api_sets.pkl'))
+        f'Constructed: {repr(A_mat)}'
+        sparse.save_npz(os.path.join(outfolder, 'hindroid', 'A_mat.npz'), A_mat)
+    else:
+        print("Already present.")
 
     # B Matrix
     print("Constructing B matrix...")
-    B_mat = build_BP_mat(pd.read_pickle('data/temp/method_api_sets.pkl'), num_apis)
-    print(f'Constructed: {repr(B_mat)}')
-    sparse.save_npz(os.path.join(outfolder, 'hindroid', 'B_mat.npz'), B_mat.astype('int'))
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'B_mat.npz')) or redo:
+        B_mat = build_BP_mat(pd.read_pickle('data/temp/method_api_sets.pkl'), num_apis)
+        print(f'Constructed: {repr(B_mat)}')
+        sparse.save_npz(os.path.join(outfolder, 'hindroid', 'B_mat.npz'), B_mat.astype('int'))
+    else:
+        print("Already present.")
     
     # P Matrix
-    print("Constructing P matrix...") 
-    P_mat = build_BP_mat(pd.read_pickle('data/temp/package_api_sets.pkl'), num_apis)
-    print(f'Constructed: {repr(P_mat)}')
-    sparse.save_npz(os.path.join(outfolder, 'hindroid', 'P_mat.npz'), P_mat.astype('int'))
+    print("Constructing P matrix...")
+    if not os.path.exists(os.path.join(outfolder, 'hindroid', 'P_mat.npz')) or redo:
+        P_mat = build_BP_mat(pd.read_pickle('data/temp/package_api_sets.pkl'), num_apis)
+        print(f'Constructed: {repr(P_mat)}')
+        sparse.save_npz(os.path.join(outfolder, 'hindroid', 'P_mat.npz'), P_mat.astype('int'))
+    else:
+        print("Already present.")
 
 def build_BP_mat(api_sets, num_apis):
     comb_func = lambda api_list: np.array(list(combinations(api_list, r=2)))
@@ -99,17 +112,17 @@ def build_BP_mat(api_sets, num_apis):
     mat += mat.T
     return mat
 
-def make_models(source_folder):
+def make_models(source_folder, redo):
     print('Fitting models:')
     apps = load_apps(source_folder)
     
     source_folder = os.path.join(source_folder, 'hindroid')
     metapath_map = {
-        'AAT': 'dot_product_mkl(A_, A.T)',
-        'ABAT': 'dot_product_mkl(dot_product_mkl(A_, B), A.T)',
-        'APAT': 'dot_product_mkl(dot_product_mkl(A_, P), A.T)',
-        'ABPBTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, B), P), B.T), A.T)',
-        'APBPTAT': 'dot_product_mkl(dot_product_mkl(dot_product_mkl(dot_product_mkl(A_, P), B), P.T), A.T)',
+        'AAT': 'A_ * A.T',
+        'ABAT': 'A_ * B * A.T',
+        'APAT': 'A_ * P * A.T',
+        'ABPBTAT': 'A_ * B * P * B * A.T',
+        'APBPTAT': 'A_ * P * B * P * A.T',
     }
     
     A = sparse.load_npz(os.path.join(source_folder, 'A_mat.npz')).astype('float32')
