@@ -6,16 +6,30 @@ import numpy as np
 import pandas as pd
 
 import dask.dataframe as dd
-
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
-
 from stellargraph import StellarGraph, IndexedArray
 from stellargraph.data import UniformRandomMetaPathWalk
-
 from gensim.models import Word2Vec
 
+from src.model.hindroid import Hindroid
+
+def fit_predict(model_type, model_args, target_path):
+    '''
+    The function called when running `python run.py model`. 
+    Will predict the data stored in the target_path folder with the model and arguments specified.
+    Will also print performance numbers.
+    '''
+    
+    if model_type.lower() == 'm2vdroid':
+        model = M2VDroid(**model_args)
+    elif model_type.lower() == 'hindroid':
+        model = HinDroid(**model_args)
+    
+    model.fit_predict(target_path)
+
 class M2VDroid():
+    """The m2vDroid classifer."""
     def __init__(self, source_folder, classifier=RandomForestClassifier, classifier_args={}, name=None):
         self.name = name if name is not None else os.path.basename(source_folder.rstrip(os.path.sep))
         self._folder = source_folder

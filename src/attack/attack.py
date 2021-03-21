@@ -2,7 +2,7 @@ from __future__ import print_function
 from scipy import sparse
 import pandas as pd
 import numpy as np
-import argparse
+import argparse, os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,6 +13,54 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import classification_report, confusion_matrix
 
 from src.imbalanced_dataset_sampler.imbalanced import ImbalancedDatasetSampler
+
+def attack():
+    dataset = HindroidDataset(**dataset_args)
+    fit_substitute()
+    pass
+
+def fit_substitute(train_dataset_args, test_dataset_args, no_cuda=False):
+    pass
+#     use_cuda = not no_cuda and torch.cuda.is_available()
+
+#     torch.manual_seed(args.seed)
+
+#     device = torch.device("cuda" if use_cuda else "cpu")
+
+#     train_kwargs = {'batch_size': batch_size}
+#     test_kwargs = {'batch_size': batch_size}
+#     if use_cuda:
+#         cuda_kwargs = {'num_workers': 1,
+#                        'pin_memory': True}
+#         train_kwargs.update(cuda_kwargs)
+#         test_kwargs.update(cuda_kwargs)
+
+#     train_dataset = HindroidDataset(**train_dataset_args)
+#     test_dataset = HindroidDataset(**test_dataset_args)
+#     train_dataset = HindroidDataset(**train_datset_args)
+#     train_loader = torch.utils.data.DataLoader(
+#         train_dataset,
+#         sampler = ImbalancedDatasetSampler(
+#             train_dataset, 
+#             callback_get_label = hindroid_custom_get_label),
+#         **train_kwargs)
+#     test_loader = torch.utils.data.DataLoader(
+#         test_dataset,
+#         sampler = ImbalancedDatasetSampler(
+#             test_dataset, 
+#             callback_get_label = hindroid_custom_get_label),
+#         **train_kwargs)
+
+#     model = HindroidSubstitute().to(device)
+#     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+
+#     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+#     for epoch in range(1, args.epochs + 1):
+#         train(args, model, device, train_loader, optimizer, epoch)
+#         test(model, device, test_loader)
+#         scheduler.step()
+
+#     torch.save(model.state_dict(), "mnist_cnn.pt")
 
 class HindroidDataset(Dataset):
     def __init__(self, features_path, labels_path, label_col='m2vDroid', transform=None):

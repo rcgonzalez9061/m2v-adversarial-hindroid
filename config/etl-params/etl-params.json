@@ -1,5 +1,5 @@
 {
-    "outfolder": "data/out/train-set",
+    "outfolder": "data/out/malware",
     "parse_params": {
         "nprocs": 16,
         "recompute": false

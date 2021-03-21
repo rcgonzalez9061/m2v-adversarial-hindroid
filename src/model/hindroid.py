@@ -5,17 +5,14 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score, accuracy_score, recall_score, classification_report
 
-import os
+import os, json, pickle, csv
 import pandas as pd
 import numpy as np
-import pickle
-import json
 from tqdm import tqdm, trange
 from p_tqdm import p_map, p_imap
 from scipy import sparse
 from itertools import combinations, product
 from functools import partial
-import csv
 from sparse_dot_mkl import dot_product_mkl
 import cupy as cp
 from cupyx.scipy.sparse import csr_matrix as csr_gpu

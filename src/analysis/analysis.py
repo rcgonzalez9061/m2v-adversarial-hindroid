@@ -149,7 +149,7 @@ def make_groundtruth_figures(data_folder, update_figs=False, no_labels=False):
             name=row['type']
 
         df = data_3d[data_3d.type==row['type']]
-        rbg = tuple([255*val for val in cm.tab10(row['num'])[:3]])
+        rbg = tuple([255*val for val in cm.tab20(row['num'])[:3]])
         color = f"rgb{rbg}"
         trace  = go.Scatter3d(
             name=name,
